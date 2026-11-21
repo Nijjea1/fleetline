@@ -38,3 +38,31 @@ Short architecture decision records. Each entry: what we chose, what we rejected
 - **Chose:** `uv` to manage Python versions and dependencies; Python 3.12.
 - **Rejected:** System Python 3.9 + pip.
 - **Why:** The system Python is old, and `uv` gives a lockfile, so every machine (Mac and the RTX 5060 box) installs identical versions.
+
+## D-006 · "World" vs. "system": two Go programs
+
+- **Date:** 2026-11-20
+- **Chose:** `worldsim` plays the city (replays rider requests, drives vehicles, emits GPS pings and trip events). `fleetd` is the production system (ingests pings, keeps state in Redis, dispatches). They only talk through Kafka.
+- **Rejected:** One program that both simulates and dispatches; writing the world simulator in Python.
+- **Why:** The dispatcher must not cheat by reading simulator memory: it sees exactly what a real dispatcher sees, late and out of order. Go because a 10k-vehicle fleet pinging every 4 s at 10× speed is ~25k events/s, too much for a Python loop. Python stays for data prep.
+
+## D-007 · Event time, not wall-clock time
+
+- **Date:** 2026-11-20
+- **Chose:** Every event carries its simulated timestamp. `fleetd`'s clock is a *watermark*: the latest event time it has seen.
+- **Rejected:** Each process computing sim time from its own wall clock.
+- **Why:** Replays run at 1×, 10× or 100× speed. With event time the dispatcher's decisions don't depend on how fast the replay runs or on clock drift between processes (the Flink/Kafka Streams model).
+
+## D-008 · Pings keyed by H3 cell + a sequence guard in Redis
+
+- **Date:** 2026-11-20
+- **Chose:** Pings are keyed by the vehicle's H3 res-7 cell (as the scope says). Redis writes go through a Lua script that (a) drops pings older than the stored one and (b) never lets a ping overwrite a dispatcher assignment the vehicle hasn't acknowledged yet (`ping.seq < pending_seq`).
+- **Rejected:** Keying pings by vehicle ID (keeps per-vehicle order, but loses geographic partitioning).
+- **Why:** When a vehicle crosses a cell boundary, its pings switch partitions, so order is no longer guaranteed. And a ping sent just before the vehicle received an assignment would mark it "idle" again, causing a double assignment. Both races are handled atomically in Redis.
+
+## D-009 · JSON on the wire first
+
+- **Date:** 2026-11-20
+- **Chose:** JSON messages.
+- **Rejected (for now):** Protobuf.
+- **Why:** JSON is readable in Redpanda Console while learning. If E1 shows serialization is a bottleneck, switching to protobuf becomes a measured improvement instead of a guess.
