@@ -146,5 +146,30 @@ func (c *Consumer) Run(ctx context.Context, handle func(Message)) error {
 	}
 }
 
+// RunBatch is like Run but hands over everything one poll returned at once. Callers
+// that write to a store (pings -> Redis) can then use one round trip per batch.
+func (c *Consumer) RunBatch(ctx context.Context, handle func([]Message)) error {
+	var batch []Message
+	for {
+		fetches := c.cl.PollRecords(ctx, 5000)
+		if ctx.Err() != nil {
+			return nil
+		}
+		if errs := fetches.Errors(); len(errs) > 0 {
+			return fmt.Errorf("fetch %s[%d]: %w", errs[0].Topic, errs[0].Partition, errs[0].Err)
+		}
+		batch = batch[:0]
+		fetches.EachRecord(func(r *kgo.Record) {
+			batch = append(batch, Message{
+				Topic: r.Topic, Key: string(r.Key), Value: r.Value,
+				Partition: r.Partition, Offset: r.Offset, BrokerTime: r.Timestamp,
+			})
+		})
+		if len(batch) > 0 {
+			handle(batch)
+		}
+	}
+}
+
 // Close leaves the group and closes the client.
 func (c *Consumer) Close() { c.cl.Close() }
