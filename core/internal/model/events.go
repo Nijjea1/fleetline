@@ -60,10 +60,10 @@ type RideRequest struct {
 type Assignment struct {
 	TripID    int64  `json:"trip_id"`
 	VehicleID string `json:"vehicle_id"`
-	Seq       int64  `json:"seq"`        // per-vehicle, strictly increasing
-	ETASec    int64  `json:"eta_s"`      // dispatcher's predicted pickup ETA
-	TS        int64  `json:"ts"`         // decision time, Unix ms (event time)
-	Policy    string `json:"policy"`     // e.g. "greedy", "batch-hungarian"
+	Seq       int64  `json:"seq"`    // per-vehicle, strictly increasing
+	ETASec    int64  `json:"eta_s"`  // dispatcher's predicted pickup ETA
+	TS        int64  `json:"ts"`     // decision time, Unix ms (event time)
+	Policy    string `json:"policy"` // e.g. "greedy", "batch-hungarian"
 }
 
 // TripEventType marks trip milestones reported by the world.
