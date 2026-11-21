@@ -31,6 +31,9 @@ func HaversineMi(lat1, lon1, lat2, lon2 float64) float64 {
 type TravelModel struct {
 	DetourFactor   float64     `json:"detour_factor"`
 	SpeedMPHByHour [24]float64 `json:"speed_mph_by_hour"`
+	// BusyVehiclesByHour is how many real Uber/Lyft cars were serving a trip at :30 past
+	// each hour. Used to size the simulated fleet (it is a lower bound on supply).
+	BusyVehiclesByHour [24]int `json:"busy_vehicles_by_hour"`
 }
 
 // LoadTravelModel reads the calibration JSON.

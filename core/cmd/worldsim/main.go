@@ -31,7 +31,8 @@ func main() {
 		brokers    = flag.String("brokers", "localhost:19092", "Kafka brokers, comma separated")
 		from       = flag.String("from", "07:00", "replay window start (HH:MM, NYC time)")
 		to         = flag.String("to", "10:00", "replay window end (HH:MM)")
-		fleet      = flag.Int("fleet", 8000, "number of vehicles")
+		fleet      = flag.Int("fleet", 0, "number of vehicles (0 = size from data, see -utilization)")
+		util       = flag.Float64("utilization", 0.75, "with -fleet 0: fleet = real busy vehicles / utilization")
 		avShare    = flag.Float64("av-share", 0.1, "fraction of the fleet that are robotaxis")
 		speed      = flag.Float64("speed", 10, "simulated seconds per wall second")
 		seed       = flag.Uint64("seed", 7, "fleet placement seed")
@@ -45,14 +46,14 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 	if err := run(ctx, log, *replayPath, *modelPath, strings.Split(*brokers, ","), *from, *to,
-		*fleet, *avShare, *speed, *seed, *pingEvery, *patience, *linger); err != nil {
+		*fleet, *util, *avShare, *speed, *seed, *pingEvery, *patience, *linger); err != nil {
 		log.Error("worldsim failed", "err", err)
 		os.Exit(1)
 	}
 }
 
 func run(ctx context.Context, log *slog.Logger, replayPath, modelPath string, brokers []string,
-	from, to string, fleet int, avShare, speed float64, seed uint64,
+	from, to string, fleet int, util, avShare, speed float64, seed uint64,
 	pingEvery, patience, linger time.Duration) error {
 
 	travel, err := geo.LoadTravelModel(modelPath)
@@ -71,6 +72,16 @@ func run(ctx context.Context, log *slog.Logger, replayPath, modelPath string, br
 	end, err := clockOn(day, to)
 	if err != nil {
 		return err
+	}
+	if fleet == 0 {
+		// Size supply from data: the real number of busy cars at the window's start hour,
+		// plus idle headroom. Utilization is an explicit, documented assumption.
+		busy := travel.BusyVehiclesByHour[time.UnixMilli(start).UTC().Hour()]
+		if busy == 0 {
+			return fmt.Errorf("travel model has no busy-vehicle data; rerun fleetline-sim calibrate")
+		}
+		fleet = int(float64(busy) / util)
+		log.Info("fleet sized from data", "real_busy", busy, "utilization", util, "fleet", fleet)
 	}
 	window := trips[:0:0]
 	for _, t := range trips {
