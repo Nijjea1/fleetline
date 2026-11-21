@@ -66,3 +66,14 @@ Short architecture decision records. Each entry: what we chose, what we rejected
 - **Chose:** JSON messages.
 - **Rejected (for now):** Protobuf.
 - **Why:** JSON is readable in Redpanda Console while learning. If E1 shows serialization is a bottleneck, switching to protobuf becomes a measured improvement instead of a guess.
+
+## D-010 · Simulation validity: warm-up, leak-free spawn, data-sized fleet
+
+- **Date:** 2026-11-20
+- **Chose:**
+  1. **Fleet size from data:** `fleet = real busy vehicles at the window's start hour / utilization` (utilization default 0.75, a stated assumption, swept in experiments).
+  2. **Spawn idle cars at the previous hour's dropoff points.**
+  3. **45-minute warm-up** before the measured window; warm-up requests are dispatched normally but flagged and excluded from stats.
+  4. **Drain** for patience + 30 min after the last request so every assigned rider is counted.
+- **Rejected:** A guessed fleet size; spawning at pickup points of the replayed requests; measuring from a cold start.
+- **Why:** The first data-sized run reported a **0.01 s median wait**, which is impossible. Root causes: cars were spawned at the pickup points of the requests about to be replayed (a *data leak*: supply placed using future demand); every car started idle although ~16k real cars were mid-trip at 7:30; and a text edit meant to extend the drain had silently not applied. Lesson: a result that is too good is a bug until proven otherwise.
