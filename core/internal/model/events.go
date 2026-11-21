@@ -54,6 +54,9 @@ type RideRequest struct {
 	DropLon  float64 `json:"drop_lon"`
 	TripTime int64   `json:"trip_time_s"` // real ride duration once picked up
 	TS       int64   `json:"ts"`          // request time, Unix ms (event time)
+	// Warmup marks requests replayed only to bring the simulation to a realistic state;
+	// they are dispatched normally but excluded from benchmark stats.
+	Warmup bool `json:"warmup,omitempty"`
 }
 
 // Assignment is the dispatcher's decision: this vehicle picks up this trip.

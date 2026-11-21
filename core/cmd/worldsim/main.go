@@ -38,6 +38,7 @@ func main() {
 		seed       = flag.Uint64("seed", 7, "fleet placement seed")
 		pingEvery  = flag.Duration("ping", 4*time.Second, "vehicle ping interval (simulated)")
 		patience   = flag.Duration("patience", 10*time.Minute, "riders give up after this")
+		warmup     = flag.Duration("warmup", 45*time.Minute, "simulate this long before -from; excluded from stats")
 		linger     = flag.Duration("linger", 5*time.Millisecond, "Kafka producer linger")
 	)
 	flag.Parse()
@@ -46,7 +47,7 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 	if err := run(ctx, log, *replayPath, *modelPath, strings.Split(*brokers, ","), *from, *to,
-		*fleet, *util, *avShare, *speed, *seed, *pingEvery, *patience, *linger); err != nil {
+		*fleet, *util, *avShare, *speed, *seed, *pingEvery, *patience, *warmup, *linger); err != nil {
 		log.Error("worldsim failed", "err", err)
 		os.Exit(1)
 	}
@@ -54,7 +55,7 @@ func main() {
 
 func run(ctx context.Context, log *slog.Logger, replayPath, modelPath string, brokers []string,
 	from, to string, fleet int, util, avShare, speed float64, seed uint64,
-	pingEvery, patience, linger time.Duration) error {
+	pingEvery, patience, warmup, linger time.Duration) error {
 
 	travel, err := geo.LoadTravelModel(modelPath)
 	if err != nil {
@@ -83,24 +84,34 @@ func run(ctx context.Context, log *slog.Logger, replayPath, modelPath string, br
 		fleet = int(float64(busy) / util)
 		log.Info("fleet sized from data", "real_busy", busy, "utilization", util, "fleet", fleet)
 	}
+	// Warm-up: the simulation starts empty (every car idle), which is nothing like a real
+	// 7 am. We run `warmup` first so cars get busy and spread out, and exclude those
+	// requests from the stats. Standard practice in discrete-event simulation.
+	simStart := start - warmup.Milliseconds()
 	window := trips[:0:0]
 	for _, t := range trips {
-		if t.TS >= start && t.TS < end {
+		if t.TS >= simStart && t.TS < end {
+			t.Warmup = t.TS < start
 			window = append(window, t)
 		}
 	}
-	log.Info("replay window", "from", from, "to", to, "requests", len(window), "fleet", fleet, "speed", speed)
+	log.Info("replay window", "from", from, "to", to, "warmup", warmup,
+		"requests", len(window), "fleet", fleet, "speed", speed)
 
-	// Place the fleet where demand is in the first 30 minutes of the window.
-	var early []model.RideRequest
-	for _, t := range window {
-		if t.TS > start+30*60_000 {
-			break
+	// Start idle cars where the previous hour's trips ended: that is where idle supply
+	// really is. (Using pickup points of the requests we're about to replay would park
+	// cars exactly where future riders appear: a data leak.)
+	var spawnAt []world.Point
+	for _, t := range trips {
+		if t.TS >= simStart-60*60_000 && t.TS < simStart {
+			spawnAt = append(spawnAt, world.Point{Lat: t.DropLat, Lon: t.DropLon})
 		}
-		early = append(early, t.RideRequest)
+	}
+	if len(spawnAt) == 0 {
+		return fmt.Errorf("no trips in the hour before %s to place the fleet", time.UnixMilli(simStart).UTC())
 	}
 	w := world.New(world.Config{Travel: travel, PingInterval: pingEvery, Patience: patience},
-		start, world.SpawnFleet(fleet, avShare, early, seed))
+		simStart, world.SpawnFleet(fleet, avShare, spawnAt, seed))
 
 	if err := bus.EnsureTopics(ctx, brokers, model.TopicPings, model.TopicRequests,
 		model.TopicAssignments, model.TopicTripEvents); err != nil {
@@ -135,9 +146,11 @@ func run(ctx context.Context, log *slog.Logger, replayPath, modelPath string, br
 		nPings, nEvents, nAssign, nBad int64
 		pickups, dropoffs, expired     int64
 		tick                           = 100 * time.Millisecond
-		drainUntil                     = end + patience.Milliseconds() // let last riders resolve
-		wallStart                      = time.Now()
-		lastLog                        = time.Now()
+		// Keep running after the last request so every assigned rider is picked up and
+		// counted; otherwise the slowest pickups silently vanish from the stats.
+		drainUntil = end + patience.Milliseconds() + 30*60_000
+		wallStart  = time.Now()
+		lastLog    = time.Now()
 	)
 	ticker := time.NewTicker(tick)
 	defer ticker.Stop()
@@ -149,7 +162,7 @@ func run(ctx context.Context, log *slog.Logger, replayPath, modelPath string, br
 			return nil
 		case <-ticker.C:
 		}
-		simNow := start + int64(float64(time.Since(wallStart).Milliseconds())*speed)
+		simNow := simStart + int64(float64(time.Since(wallStart).Milliseconds())*speed)
 		if simNow > drainUntil {
 			break
 		}

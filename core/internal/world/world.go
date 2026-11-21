@@ -222,19 +222,22 @@ func (w *World) expire() []model.TripEvent {
 	return ev
 }
 
-// SpawnFleet places n vehicles at pickup locations drawn (seeded) from the given
-// requests, so supply starts where demand is. avShare of them are robotaxis.
-func SpawnFleet(n int, avShare float64, from []model.RideRequest, seed uint64) []*Vehicle {
+// Point is a lat/lon location.
+type Point struct{ Lat, Lon float64 }
+
+// SpawnFleet places n idle vehicles at locations drawn (seeded, with replacement) from
+// `at`. avShare of them are robotaxis.
+func SpawnFleet(n int, avShare float64, at []Point, seed uint64) []*Vehicle {
 	rng := rand.New(rand.NewPCG(seed, seed^0x9e3779b97f4a7c15))
 	out := make([]*Vehicle, n)
 	nAV := int(float64(n) * avShare)
 	for i := range out {
-		r := from[rng.IntN(len(from))]
+		r := at[rng.IntN(len(at))]
 		kind, prefix := model.KindHuman, "h"
 		if i < nAV {
 			kind, prefix = model.KindAV, "av"
 		}
-		out[i] = &Vehicle{ID: fmt.Sprintf("%s%05d", prefix, i), Kind: kind, ToLat: r.PickLat, ToLon: r.PickLon}
+		out[i] = &Vehicle{ID: fmt.Sprintf("%s%05d", prefix, i), Kind: kind, ToLat: r.Lat, ToLon: r.Lon}
 	}
 	return out
 }

@@ -78,7 +78,7 @@ func TestLateAssignmentStillAdvancesSeq(t *testing.T) {
 }
 
 func TestPingsAreStaggeredAndPeriodic(t *testing.T) {
-	vs := SpawnFleet(100, 0.1, []model.RideRequest{{PickLat: 40, PickLon: -74}}, 1)
+	vs := SpawnFleet(100, 0.1, []Point{{Lat: 40, Lon: -74}}, 1)
 	w := New(testCfg(), 0, vs)
 	total := 0
 	for ts := int64(0); ts < 40_000; ts += 1000 {
@@ -91,7 +91,7 @@ func TestPingsAreStaggeredAndPeriodic(t *testing.T) {
 }
 
 func TestSpawnFleetDeterministicWithAVShare(t *testing.T) {
-	reqs := []model.RideRequest{{PickLat: 1}, {PickLat: 2}, {PickLat: 3}}
+	reqs := []Point{{Lat: 1}, {Lat: 2}, {Lat: 3}}
 	a := SpawnFleet(50, 0.2, reqs, 42)
 	b := SpawnFleet(50, 0.2, reqs, 42)
 	av := 0
