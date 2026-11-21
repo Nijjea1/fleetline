@@ -9,7 +9,11 @@ require (
 )
 
 require (
+	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/klauspost/compress v1.20.4 // indirect
 	github.com/pierrec/lz4/v4 v4.1.33 // indirect
+	github.com/redis/go-redis/v9 v9.23.0 // indirect
 	github.com/twmb/franz-go/pkg/kmsg v1.15.1 // indirect
+	go.uber.org/atomic v1.12.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
 )
