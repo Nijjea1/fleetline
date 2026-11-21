@@ -21,9 +21,10 @@ _to_wgs84 = Transformer.from_crs(NATIVE_CRS, WGS84, always_xy=True)
 
 def load_zones(zip_path: Path) -> gpd.GeoDataFrame:
     """Load the zone shapefile, one row per LocationID, in native (feet) CRS."""
-    gdf = gpd.read_file(f"zip://{zip_path}").to_crs(NATIVE_CRS)
+    gdf = gpd.read_file(f"zip://{zip_path.resolve()}!taxi_zones/taxi_zones.shp").to_crs(NATIVE_CRS)
     # A few LocationIDs appear as multiple rows (islands); merge them into one geometry.
-    gdf = gdf.dissolve(by="LocationID", as_index=False)[["LocationID", "zone", "borough", "geometry"]]
+    gdf = gdf.dissolve(by="LocationID", as_index=False)
+    gdf = gdf[["LocationID", "zone", "borough", "geometry"]]
     gdf["LocationID"] = gdf["LocationID"].astype(int)
     return gdf.sort_values("LocationID").reset_index(drop=True)
 
