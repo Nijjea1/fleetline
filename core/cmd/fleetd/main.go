@@ -41,10 +41,14 @@ type server struct {
 
 	watermark atomic.Int64 // latest event time seen (D-007)
 
-	mu        sync.Mutex
-	pending   []model.RideRequest
-	requestTS map[int64]int64 // trip -> request time, to compute waits from trip events
-	kindOf    map[int64]string
+	mu       sync.Mutex
+	pending  []model.RideRequest
+	requests map[int64]reqInfo // trip -> request info, to compute waits from trip events
+}
+
+type reqInfo struct {
+	ts     int64
+	warmup bool
 }
 
 func main() {
@@ -101,7 +105,7 @@ func run(ctx context.Context, log *slog.Logger, brokers []string, redisAddr, mod
 		log: log, store: store, prod: prod,
 		policy:   &dispatch.Greedy{Travel: travel, RadiusMi: radius, K: k},
 		patience: patience.Milliseconds(), window: window.Milliseconds(),
-		summary: metrics.NewSummary(), requestTS: map[int64]int64{}, kindOf: map[int64]string{},
+		summary: metrics.NewSummary(), requests: map[int64]reqInfo{},
 	}
 
 	cons, err := bus.NewConsumer(brokers, "fleetd", false,
@@ -151,7 +155,7 @@ func (s *server) handleBatch(msgs []bus.Message) {
 			metrics.RequestsTotal.Inc()
 			s.mu.Lock()
 			s.pending = append(s.pending, r)
-			s.requestTS[r.TripID] = r.TS
+			s.requests[r.TripID] = reqInfo{ts: r.TS, warmup: r.Warmup}
 			s.mu.Unlock()
 		case model.TopicTripEvents:
 			var e model.TripEvent
@@ -182,23 +186,28 @@ func (s *server) handleBatch(msgs []bus.Message) {
 func (s *server) onTripEvent(e model.TripEvent) {
 	switch e.Type {
 	case model.TripPickup:
-		s.mu.Lock()
-		reqTS, ok := s.requestTS[e.TripID]
-		delete(s.requestTS, e.TripID)
-		s.mu.Unlock()
-		if ok {
-			wait := float64(e.TS-reqTS) / 1000
+		info, ok := s.takeRequest(e.TripID)
+		metrics.TripsTotal.WithLabelValues("served").Inc()
+		if ok && !info.warmup {
+			wait := float64(e.TS-info.ts) / 1000
 			metrics.RiderWait.Observe(wait)
 			s.summary.Pickup(wait)
 		}
-		metrics.TripsTotal.WithLabelValues("served").Inc()
 	case model.TripExpired:
-		s.mu.Lock()
-		delete(s.requestTS, e.TripID)
-		s.mu.Unlock()
-		s.summary.Expired()
+		info, ok := s.takeRequest(e.TripID)
 		metrics.TripsTotal.WithLabelValues("expired").Inc()
+		if ok && !info.warmup {
+			s.summary.Expired()
+		}
 	}
+}
+
+func (s *server) takeRequest(trip int64) (reqInfo, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	info, ok := s.requests[trip]
+	delete(s.requests, trip)
+	return info, ok
 }
 
 // dispatchLoop runs one dispatch round each time event time advances by `window`.
@@ -242,12 +251,20 @@ func (s *server) round(ctx context.Context, now int64) {
 		s.log.Error("dispatch", "err", err)
 	}
 	done := make(map[int64]bool, len(assigned))
+	warm := make(map[int64]bool)
+	for _, r := range live {
+		if r.Warmup {
+			warm[r.TripID] = true
+		}
+	}
 	for _, a := range assigned {
 		done[a.TripID] = true
 		_ = s.prod.Publish(ctx, model.TopicAssignments, a.VehicleID, a)
 		kind := string(a.Kind)
 		metrics.AssignmentsTotal.WithLabelValues(kind).Inc()
-		s.summary.Assigned(kind)
+		if !warm[a.TripID] {
+			s.summary.Assigned(kind)
+		}
 	}
 
 	// Unmatched requests go back to the front of the queue (they are the oldest).
