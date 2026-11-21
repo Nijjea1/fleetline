@@ -1,0 +1,40 @@
+# Data: never commit raw or derived datasets (size + licenses). Scripts recreate them.
+data/
+*.parquet
+*.zip
+*.pbf
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Go
+core/bin/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+.vercel/
+
+# Benchmarks: raw run dumps stay local; summarized results/ are committed
+bench/**/raw/
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Terraform
+infra/**/.terraform/
+*.tfstate
+*.tfstate.*
