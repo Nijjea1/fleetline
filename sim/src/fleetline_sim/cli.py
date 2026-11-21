@@ -45,8 +45,10 @@ def calibrate(
     seed: int = typer.Option(7, help="Seed the replay day was built with"),
 ) -> None:
     """Fit the simulator's travel model (detour factor, speed by hour) from real trips."""
-    model = cal.calibrate(DERIVED_DIR / f"day_{day}_seed{seed}.parquet")
+    d = date.fromisoformat(day)
+    model = cal.calibrate(DERIVED_DIR / f"day_{day}_seed{seed}.parquet", prep.month_file_for(d), d)
     dest = cal.write(model, DERIVED_DIR / f"travel_model_{day}.json")
     print(f"detour factor {model['detour_factor']} from {model['trips_used_for_detour']:,} trips")
     print("mph by hour:", model["speed_mph_by_hour"])
+    print("busy vehicles by hour:", model["busy_vehicles_by_hour"])
     print(f"-> {dest.name}")

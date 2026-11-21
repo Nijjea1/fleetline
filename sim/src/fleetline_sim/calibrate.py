@@ -7,10 +7,16 @@ The simulator moves vehicles in straight lines, so it needs two numbers from dat
 2. **Speed by hour of day**: median of trip_miles / trip_time per request hour. Midnight
    traffic and 5 pm traffic are very different.
 
+3. **Busy vehicles by hour**: how many Uber/Lyft cars were between accepting a request
+   and dropping off, sampled at :30 past each hour, from the *raw* month file (so trips
+   requested the evening before still count). It is a lower bound on the active fleet,
+   which lets us size the simulated fleet from data instead of guessing.
+
 Output: data/derived/travel_model_<day>.json, read by the Go world simulator.
 """
 
 import json
+from datetime import date, datetime
 from pathlib import Path
 
 import numpy as np
@@ -27,7 +33,18 @@ def haversine_mi(lat1, lon1, lat2, lon2) -> np.ndarray:
     return 2 * EARTH_RADIUS_MI * np.arcsin(np.sqrt(a))
 
 
-def calibrate(day_file: Path) -> dict:
+def busy_vehicles_by_hour(month_file: Path, day: date) -> list[int]:
+    d = pl.scan_parquet(month_file).select("request_datetime", "dropoff_datetime")
+    exprs = []
+    for h in range(24):
+        t = datetime(day.year, day.month, day.day, h, 30)
+        busy = (pl.col("request_datetime") <= t) & (pl.col("dropoff_datetime") > t)
+        exprs.append(busy.sum().alias(str(h)))
+    row = d.select(exprs).collect().row(0)
+    return [int(x) for x in row]
+
+
+def calibrate(day_file: Path, month_file: Path, day: date) -> dict:
     df = pl.read_parquet(day_file)
     straight = haversine_mi(df["pu_lat"], df["pu_lon"], df["do_lat"], df["do_lon"])
     df = df.with_columns(straight_mi=pl.Series(straight))
@@ -52,6 +69,7 @@ def calibrate(day_file: Path) -> dict:
         "detour_factor": round(detour, 4),
         "trips_used_for_detour": long_trips.height,
         "speed_mph_by_hour": [round(v, 3) for v in speeds["mph"].to_list()],
+        "busy_vehicles_by_hour": busy_vehicles_by_hour(month_file, day),
     }
 
 
