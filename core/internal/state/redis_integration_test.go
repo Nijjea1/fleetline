@@ -112,3 +112,35 @@ func TestNearestIdleOrdersByDistance(t *testing.T) {
 		t.Fatalf("unexpected candidates %+v", c)
 	}
 }
+
+func TestNearestIdleManyMatchesSingle(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	ps := []Ping{
+		{VehicleID: "a", Kind: model.KindHuman, Lat: 40.751, Lon: -73.99, Status: model.StatusIdle, TS: 1},
+		{VehicleID: "b", Kind: model.KindHuman, Lat: 40.80, Lon: -73.95, Status: model.StatusIdle, TS: 1},
+	}
+	if _, err := s.ApplyPings(ctx, ps); err != nil {
+		t.Fatal(err)
+	}
+	qs := []Query{
+		{Kind: model.KindHuman, Lat: 40.75, Lon: -73.99, RadiusMi: 10, K: 5},
+		{Kind: model.KindHuman, Lat: 40.80, Lon: -73.95, RadiusMi: 0.1, K: 5},
+		{Kind: model.KindAV, Lat: 40.75, Lon: -73.99, RadiusMi: 10, K: 5}, // empty set
+	}
+	got, err := s.NearestIdleMany(ctx, qs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, q := range qs {
+		want, _ := s.NearestIdle(ctx, q.Kind, q.Lat, q.Lon, q.RadiusMi, q.K)
+		if len(got[i]) != len(want) {
+			t.Fatalf("query %d: batch %d results, single %d", i, len(got[i]), len(want))
+		}
+		for j := range want {
+			if got[i][j].VehicleID != want[j].VehicleID {
+				t.Fatalf("query %d result %d differs", i, j)
+			}
+		}
+	}
+}

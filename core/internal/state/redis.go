@@ -11,6 +11,7 @@ package state
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 
@@ -131,6 +132,46 @@ func (s *Store) NearestIdle(ctx context.Context, kind model.VehicleKind, lat, lo
 	out := make([]Candidate, len(res))
 	for i, r := range res {
 		out[i] = Candidate{VehicleID: r.Name, Kind: kind, Lat: r.Latitude, Lon: r.Longitude, DistMi: r.Dist}
+	}
+	return out, nil
+}
+
+// Query is one nearest-idle search.
+type Query struct {
+	Kind     model.VehicleKind
+	Lat, Lon float64
+	RadiusMi float64
+	K        int
+}
+
+// NearestIdleMany runs many searches in one pipeline: one network round trip instead of
+// len(qs). With thousands of waiting riders per round this is the difference between a
+// dispatch round taking milliseconds and taking hundreds of milliseconds.
+func (s *Store) NearestIdleMany(ctx context.Context, qs []Query) ([][]Candidate, error) {
+	if len(qs) == 0 {
+		return nil, nil
+	}
+	pipe := s.rdb.Pipeline()
+	cmds := make([]*redis.GeoSearchLocationCmd, len(qs))
+	for i, q := range qs {
+		cmds[i] = pipe.GeoSearchLocation(ctx, idleKey(q.Kind), &redis.GeoSearchLocationQuery{
+			GeoSearchQuery: redis.GeoSearchQuery{
+				Longitude: q.Lon, Latitude: q.Lat,
+				Radius: q.RadiusMi, RadiusUnit: "mi",
+				Sort: "ASC", Count: q.K,
+			},
+			WithCoord: true, WithDist: true,
+		})
+	}
+	if _, err := pipe.Exec(ctx); err != nil && !errors.Is(err, redis.Nil) {
+		return nil, err
+	}
+	out := make([][]Candidate, len(qs))
+	for i, c := range cmds {
+		for _, r := range c.Val() {
+			out[i] = append(out[i], Candidate{VehicleID: r.Name, Kind: qs[i].Kind,
+				Lat: r.Latitude, Lon: r.Longitude, DistMi: r.Dist})
+		}
 	}
 	return out, nil
 }

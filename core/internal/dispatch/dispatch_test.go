@@ -42,6 +42,14 @@ func (p *memPool) NearestIdle(_ context.Context, kind model.VehicleKind, lat, lo
 	return out, nil
 }
 
+func (p *memPool) NearestIdleMany(ctx context.Context, qs []state.Query) ([][]state.Candidate, error) {
+	out := make([][]state.Candidate, len(qs))
+	for i, q := range qs {
+		out[i], _ = p.NearestIdle(ctx, q.Kind, q.Lat, q.Lon, q.RadiusMi, q.K)
+	}
+	return out, nil
+}
+
 func (p *memPool) Claim(_ context.Context, id string, _ model.VehicleKind) (int64, bool, error) {
 	if _, ok := p.idle[id]; !ok {
 		return 0, false, nil
