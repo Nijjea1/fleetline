@@ -28,3 +28,14 @@ Fleetline replays a real day of NYC ride-hail demand, assigns every request to a
 - [Progress log](docs/PROGRESS.md)
 - [Decision log](docs/DECISIONS.md)
 - [Datasets](docs/DATASETS.md)
+- [Learning notes](docs/learning/)
+
+## Quick start (so far)
+
+```bash
+cd sim
+uv run fleetline-sim download            # ~510 MB: Sep 2026 Uber/Lyft trips + zone shapes
+uv run fleetline-sim prepare             # builds data/derived/day_2026-09-16_seed7.parquet
+uv run pytest
+make up                                  # from repo root: Redpanda, Console (localhost:8080), Redis
+```
