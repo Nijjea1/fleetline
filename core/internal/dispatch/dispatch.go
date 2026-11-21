@@ -84,7 +84,7 @@ func (g *Greedy) Dispatch(ctx context.Context, now int64, pending []model.RideRe
 				continue // someone else took it; try the next best
 			}
 			out = append(out, model.Assignment{
-				TripID: r.TripID, VehicleID: o.c.VehicleID, Seq: seq,
+				TripID: r.TripID, VehicleID: o.c.VehicleID, Kind: o.c.Kind, Seq: seq,
 				ETASec: int64(o.eta), TS: now, Policy: g.Name(),
 			})
 			break
