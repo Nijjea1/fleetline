@@ -1,0 +1,46 @@
+# Local dev infrastructure for Fleetline.
+# Start: make up    Stop: make down
+name: fleetline
+
+services:
+  # Redpanda: a single-binary, Kafka-API-compatible broker. Our Go code talks
+  # to it with a normal Kafka client, so moving to AWS MSK later is a config change.
+  redpanda:
+    image: redpandadata/redpanda:v24.2.7
+    command:
+      - redpanda start
+      - --smp 1                 # one CPU core is plenty locally
+      - --memory 1G
+      - --overprovisioned       # don't pin threads; we share the laptop
+      - --mode dev-container
+      - --kafka-addr internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr internal://redpanda:9092,external://localhost:19092
+    ports:
+      - "19092:19092"   # Kafka API for host processes (Go service, Python sim)
+      - "9644:9644"     # admin API / Prometheus metrics
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -q 'Healthy:.*true'"]
+      interval: 5s
+      retries: 20
+
+  # Web UI to inspect topics and messages while learning.
+  console:
+    image: redpandadata/console:v2.7.2
+    environment:
+      KAFKA_BROKERS: redpanda:9092
+    ports:
+      - "8080:8080"
+    depends_on:
+      redpanda:
+        condition: service_healthy
+
+  # Redis: live vehicle state (position, status, H3 cell) with sub-millisecond reads.
+  redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]  # state is ephemeral by design
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 20
