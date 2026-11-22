@@ -38,3 +38,9 @@ bench/**/raw/
 infra/**/.terraform/
 *.tfstate
 *.tfstate.*
+
+# Offline run outputs: per-trip and per-minute CSVs are large and regenerable;
+# summary.json files are small and committed as evidence.
+bench/runs/**/trips.csv
+bench/runs/**/samples.csv
+bench/runs/smoke*/
