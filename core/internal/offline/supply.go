@@ -14,12 +14,22 @@ type FixedSupply int
 func (f FixedSupply) Target(int64) int { return int(f) }
 
 // DataSupply follows the real busy-vehicle curve: busy[h] is how many real cars were
-// serving a trip at h:30. Between samples we interpolate linearly, then divide by the
-// assumed utilization to include idle cars. Utilization is the one free parameter, and
-// it is calibrated so simulated waits match real ones (see bench/calibrate_supply).
+// serving a trip at h:30. Online drivers at h:30 = busy[h] / utilization[h]; between
+// samples we interpolate linearly. Utilization is the free parameter: either one value
+// for the whole day, or one per hour fitted by cmd/calibrate so that greedy's simulated
+// waits match the real ones hour by hour.
 type DataSupply struct {
 	Busy        [24]int
-	Utilization float64
+	Utilization float64      // used when PerHour is nil
+	PerHour     *[24]float64 // calibrated utilization by hour
+}
+
+func (d DataSupply) online(h int) float64 {
+	u := d.Utilization
+	if d.PerHour != nil {
+		u = d.PerHour[h]
+	}
+	return float64(d.Busy[h]) / u
 }
 
 // Target implements Supply.
@@ -36,6 +46,5 @@ func (d DataSupply) Target(t int64) int {
 	if hi > 23 {
 		hi, frac = 23, 0
 	}
-	busy := float64(d.Busy[lo])*(1-frac) + float64(d.Busy[hi])*frac
-	return int(busy / d.Utilization)
+	return int(d.online(lo)*(1-frac) + d.online(hi)*frac)
 }

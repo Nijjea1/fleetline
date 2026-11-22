@@ -22,3 +22,23 @@ func TestDataSupplyInterpolates(t *testing.T) {
 		t.Fatalf("end of day: %d", got)
 	}
 }
+
+func TestDataSupplyPerHour(t *testing.T) {
+	var d DataSupply
+	d.Busy[7], d.Busy[8] = 1000, 1000
+	u := [24]float64{}
+	for h := range u {
+		u[h] = 1
+	}
+	u[8] = 0.5
+	d.PerHour = &u
+	if got := d.Target(at(7, 30)); got != 1000 {
+		t.Fatalf("07:30: %d", got)
+	}
+	if got := d.Target(at(8, 30)); got != 2000 {
+		t.Fatalf("08:30: %d", got)
+	}
+	if got := d.Target(at(8, 0)); got != 1500 {
+		t.Fatalf("08:00 should interpolate online counts: %d", got)
+	}
+}
