@@ -45,6 +45,7 @@ type Params struct {
 	Supply      string  `json:"supply"`
 	Fleet       int     `json:"fleet,omitempty"`
 	Utilization float64 `json:"utilization,omitempty"`
+	SupplyFile  string  `json:"supply_file,omitempty"`
 	AVShare     float64 `json:"av_share"`
 	Seed        uint64  `json:"seed"`
 }
@@ -65,6 +66,7 @@ func main() {
 	flag.StringVar(&p.Supply, "supply", "data", "data (follow real busy curve) or fixed")
 	flag.IntVar(&p.Fleet, "fleet", 20000, "with -supply fixed: number of vehicles")
 	flag.Float64Var(&p.Utilization, "utilization", 0.75, "with -supply data: busy / online")
+	flag.StringVar(&p.SupplyFile, "supply-file", "", "with -supply data: per-hour utilization from cmd/calibrate")
 	flag.Float64Var(&p.AVShare, "av-share", 0.1, "fraction of new drivers that are robotaxis")
 	flag.Uint64Var(&p.Seed, "seed", 7, "random seed (fleet placement, log-offs)")
 	out := flag.String("out", "", "output directory (required)")
@@ -116,7 +118,22 @@ func run(ctx context.Context, log *slog.Logger, p Params, out string) error {
 	var supply offline.Supply
 	switch p.Supply {
 	case "data":
-		supply = offline.DataSupply{Busy: travel.BusyVehiclesByHour, Utilization: p.Utilization}
+		ds := offline.DataSupply{Busy: travel.BusyVehiclesByHour, Utilization: p.Utilization}
+		if p.SupplyFile != "" {
+			var cal struct {
+				U [24]float64 `json:"utilization_by_hour"`
+			}
+			b, err := os.ReadFile(p.SupplyFile)
+			if err != nil {
+				return err
+			}
+			if err := json.Unmarshal(b, &cal); err != nil {
+				return fmt.Errorf("%s: %w", p.SupplyFile, err)
+			}
+			ds.PerHour = &cal.U
+			p.Utilization = 0
+		}
+		supply = ds
 		p.Fleet = 0
 	case "fixed":
 		supply = offline.FixedSupply(p.Fleet)
