@@ -33,7 +33,11 @@ WEATHER_COLS = ["temperature_2m", "precipitation", "snowfall", "wind_speed_10m"]
 
 def build(month: str = "2026-09") -> dict[str, dict[str, int]]:
     trips = pl.scan_parquet(RAW_DIR / f"fhvhv_tripdata_{month}.parquet").select(
-        "pickup_datetime", "PULocationID", "DOLocationID", "trip_time", "trip_miles",
+        "pickup_datetime",
+        "PULocationID",
+        "DOLocationID",
+        "trip_time",
+        "trip_miles",
         "shared_match_flag",
     )
     osrm = pl.scan_parquet(DERIVED_DIR / "osrm_zone_matrix.parquet")
@@ -51,8 +55,9 @@ def build(month: str = "2026-09") -> dict[str, dict[str, int]]:
             day=pl.col("pickup_datetime").dt.date(),
             hour=pl.col("pickup_datetime").dt.hour().cast(pl.Int8),
             dow=(pl.col("pickup_datetime").dt.weekday() - 1).cast(pl.Int8),  # Mon=0
-            minute_of_day=(pl.col("pickup_datetime").dt.hour() * 60
-                           + pl.col("pickup_datetime").dt.minute()).cast(pl.Int16),
+            minute_of_day=(
+                pl.col("pickup_datetime").dt.hour() * 60 + pl.col("pickup_datetime").dt.minute()
+            ).cast(pl.Int16),
             hour_ts=pl.col("pickup_datetime").dt.truncate("1h"),
             trip_time_s=pl.col("trip_time").cast(pl.Float32),
             mph=pl.col("trip_miles") / (pl.col("trip_time") / 3600),
@@ -64,8 +69,19 @@ def build(month: str = "2026-09") -> dict[str, dict[str, int]]:
 
     ETA_DIR.mkdir(parents=True, exist_ok=True)
     report = {}
-    keep = ["pu_zone", "do_zone", "hour", "dow", "minute_of_day", "is_holiday",
-            "osrm_s", "osrm_mi", *WEATHER_COLS, "trip_time_s", "pickup_datetime"]
+    keep = [
+        "pu_zone",
+        "do_zone",
+        "hour",
+        "dow",
+        "minute_of_day",
+        "is_holiday",
+        "osrm_s",
+        "osrm_mi",
+        *WEATHER_COLS,
+        "trip_time_s",
+        "pickup_datetime",
+    ]
     for name, (lo, hi) in SPLITS.items():
         part = base.filter(pl.col("day").is_between(lo, hi))
         if name == "train":

@@ -18,9 +18,12 @@ OSRM_URL = "http://localhost:5001"
 
 def build(url: str = OSRM_URL) -> pl.DataFrame:
     pts = pl.read_parquet(DERIVED_DIR / "zone_points.parquet").sort("zone")
-    coords = ";".join(f"{lon:.6f},{lat:.6f}" for lon, lat in zip(pts["lon"], pts["lat"], strict=True))
-    r = httpx.get(f"{url}/table/v1/driving/{coords}", params={"annotations": "duration,distance"},
-                  timeout=120)
+    coords = ";".join(
+        f"{lon:.6f},{lat:.6f}" for lon, lat in zip(pts["lon"], pts["lat"], strict=True)
+    )
+    r = httpx.get(
+        f"{url}/table/v1/driving/{coords}", params={"annotations": "duration,distance"}, timeout=120
+    )
     r.raise_for_status()
     body = r.json()
     if body.get("code") != "Ok":
@@ -29,12 +32,14 @@ def build(url: str = OSRM_URL) -> pl.DataFrame:
     dist = np.array(body["distances"], dtype=np.float64)
     zones = pts["zone"].to_numpy()
     n = len(zones)
-    out = pl.DataFrame({
-        "pu_zone": np.repeat(zones, n).astype(np.int16),
-        "do_zone": np.tile(zones, n).astype(np.int16),
-        "osrm_s": dur.ravel().astype(np.float32),
-        "osrm_mi": (dist.ravel() / 1609.344).astype(np.float32),
-    })
+    out = pl.DataFrame(
+        {
+            "pu_zone": np.repeat(zones, n).astype(np.int16),
+            "do_zone": np.tile(zones, n).astype(np.int16),
+            "osrm_s": dur.ravel().astype(np.float32),
+            "osrm_mi": (dist.ravel() / 1609.344).astype(np.float32),
+        }
+    )
     return out
 
 

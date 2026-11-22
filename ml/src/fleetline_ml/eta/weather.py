@@ -14,11 +14,18 @@ VARS = ["temperature_2m", "precipitation", "snowfall", "wind_speed_10m"]
 
 
 def fetch(start: str, end: str) -> pl.DataFrame:
-    r = httpx.get(ARCHIVE, timeout=60, params={
-        "latitude": 40.7812, "longitude": -73.9665,
-        "start_date": start, "end_date": end,
-        "hourly": ",".join(VARS), "timezone": "America/New_York",
-    })
+    r = httpx.get(
+        ARCHIVE,
+        timeout=60,
+        params={
+            "latitude": 40.7812,
+            "longitude": -73.9665,
+            "start_date": start,
+            "end_date": end,
+            "hourly": ",".join(VARS),
+            "timezone": "America/New_York",
+        },
+    )
     r.raise_for_status()
     h = r.json()["hourly"]
     return pl.DataFrame({"hour_ts": h["time"], **{v: h[v] for v in VARS}}).with_columns(
