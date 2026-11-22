@@ -243,12 +243,20 @@ func (r *runner) adjustSupply(t int64) {
 }
 
 // spawn adds a driver at the dropoff point of a random real trip requested in the past
-// hour: that's where idle cars actually are. Never uses future requests (D-010).
+// hour: that's where idle cars actually are (D-010).
+//
+// The replay file holds one day, so at 00:00 there is no "past hour". Only then do we
+// fall back to dropoffs from the next hour. That touches future data, so full-day runs
+// must start measuring after a warm-up (see cmd/offline: -from 01:00 -warmup 60m).
+// An earlier fallback used a single trip, which stacked every car on one point.
 func (r *runner) spawn(t int64) {
 	lo := sort.Search(len(r.trips), func(i int) bool { return r.trips[i].TS >= t-3_600_000 })
 	hi := sort.Search(len(r.trips), func(i int) bool { return r.trips[i].TS >= t })
 	if hi <= lo {
-		hi = min(lo+1, len(r.trips)) // start of day: fall back to the earliest trip
+		hi = sort.Search(len(r.trips), func(i int) bool { return r.trips[i].TS >= t+3_600_000 })
+	}
+	if hi <= lo {
+		hi = len(r.trips)
 	}
 	src := r.trips[lo+r.rng.IntN(hi-lo)]
 	kind, prefix := model.KindHuman, "h"

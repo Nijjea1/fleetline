@@ -141,3 +141,25 @@ func TestDataSupplyTracksTarget(t *testing.T) {
 		}
 	}
 }
+
+// Regression: with no trips in the hour before the start, every car used to spawn on the
+// same point, making nearest-car search scan the whole fleet in one grid cell.
+func TestStartOfDaySpawnIsSpreadOut(t *testing.T) {
+	trips := synthetic(2000, 5) // first trip at 06:00
+	c := cfg(200)
+	c.From, c.Warmup = at(6, 0), 0
+	r := &runner{cfg: c, trips: trips, results: map[int64]*TripResult{}, online: map[string]bool{}}
+	r.rng = rand.New(rand.NewPCG(1, 2))
+	r.pool = newPool()
+	r.w = newWorld(c, c.From)
+	for i := 0; i < 200; i++ {
+		r.spawn(c.From)
+	}
+	seen := map[[2]float64]bool{}
+	for _, v := range r.w.Vehicles() {
+		seen[[2]float64{v.ToLat, v.ToLon}] = true
+	}
+	if len(seen) < 150 {
+		t.Fatalf("only %d distinct spawn points for 200 cars", len(seen))
+	}
+}
