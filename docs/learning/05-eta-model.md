@@ -43,7 +43,11 @@ Each row is a hypothesis you can state in one sentence, and each improvement is 
 - **Zero-initialized output layer**: the untrained model predicts exactly B2 (a unit test checks this), so training starts from a good place.
 
 ### Result so far, and why it's not a failure
-First full run (hidden 256, 4 epochs, 63 s on the M5's GPU): **266.1 s**, better than B2 (314.4) but **worse than LightGBM (236.5)**. Gradient-boosted trees are very strong on tabular data. Reporting this honestly, then testing a wider network trained longer, is the experiment. "My neural net lost to LightGBM and here's what I tried" is a credible interview answer.
+First full run (hidden 256, 4 epochs, 63 s on the M5's GPU): **266.1 s**, better than B2 (314.4) but **worse than LightGBM (236.5)**.
+
+Then the obvious test: is the network too small or under-trained? Hidden 512 for 12 epochs (7 min): **268.1 s**, no better. Validation MAE flattened near 274 s by epoch 5. So it isn't capacity or training time; the trees are getting information out of the features that the MLP isn't (GBDTs split sharply on exact zone IDs and thresholds, which is what zone-level data rewards).
+
+Gradient-boosted trees are very strong on tabular data, and published benchmarks agree. "My neural net lost to LightGBM, here's how I ruled out capacity and what I'd try next" is a stronger interview answer than a suspicious win.
 
 ### ONNX, and when the GPU wins (E6)
 ONNX is a portable graph format: PyTorch exports it, and ONNX Runtime and TensorRT run it. The exported model matches PyTorch to within 0.0005 s per prediction and gives the identical test MAE.

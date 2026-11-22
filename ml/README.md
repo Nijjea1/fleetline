@@ -68,13 +68,24 @@ uv run fleetline-ml export                     # E6 (Mac) -> results/e6_inferenc
 | B1 × global | 348.4 | 797.1 | +1.5 |
 | B2 × hour-of-week | 314.4 | 704.6 | +0.5 |
 | B3 LightGBM | 236.5 | 503.2 | −14.7 |
-| M1 residual MLP | *pending full run* | | |
+| M1 residual MLP (h256, 4 epochs, 63 s on M5 GPU) | 266.1 | 572.3 | — |
+| M1 wide (h512, 12 epochs, 442 s) | 268.1 | 584.0 | +35.4 |
+
+**Verdict so far: LightGBM wins.** The residual MLP beats every non-ML baseline by ~15%, but a wider network trained 3× longer is no better (validation plateaus at ~274 s by epoch 5), so capacity and training time aren't the limit. Next ideas, each a measured experiment: feed LightGBM's prediction as the base (stacking), add zone-pair historical medians as a feature, try a pickup-time-of-day × zone-pair interaction.
 
 **Why residual?** Uber's DeepETA predicts a correction to a routing engine's estimate rather than the whole time. The routing engine already knows the map; the network only has to learn traffic and local quirks. With a zero-initialized output layer, the untrained network predicts exactly the baseline, so training can only improve on it.
 
 ## Inference (E6)
 
-Dispatch scores many (car, rider) pairs per round, so latency **per batch** matters. Every runtime serves the same ONNX file. Mac numbers: `results/e6_inference_mac.json`. TensorRT FP32/FP16 (and INT8 with calibration) run on the RTX 5060 via `tensorrt/bench.sh`.
+Dispatch scores many (car, rider) pairs per round, so latency **per batch** matters. ONNX export matches PyTorch to within 0.0005 s and gives the identical test MAE (266.10 s).
+
+| Batch | PyTorch CPU | ONNX Runtime CPU | PyTorch MPS (M5 GPU) |
+| --- | --- | --- | --- |
+| 1 | 0.058 ms | **0.019 ms** | 0.324 ms |
+| 1,024 | 0.670 ms | **0.540 ms** | 0.865 ms |
+| 8,192 | 20.1 ms* | 24.4 ms* | **1.9 ms** |
+
+p50 latency, 200 reps after warm-up. *Measured while another job was using the CPU; to be re-run idle before quoting. Every runtime serves the same ONNX file. Mac numbers: `results/e6_inference_mac.json`. TensorRT FP32/FP16 (and INT8 with calibration) run on the RTX 5060 via `tensorrt/bench.sh`.
 
 ## Robotaxi motion model (stretch, E8)
 
