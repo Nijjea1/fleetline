@@ -77,3 +77,11 @@ Short architecture decision records. Each entry: what we chose, what we rejected
   4. **Drain** for patience + 30 min after the last request so every assigned rider is counted.
 - **Rejected:** A guessed fleet size; spawning at pickup points of the replayed requests; measuring from a cold start.
 - **Why:** The first data-sized run reported a **0.01 s median wait**, which is impossible. Root causes: cars were spawned at the pickup points of the requests about to be replayed (a *data leak*: supply placed using future demand); every car started idle although ~16k real cars were mid-trip at 7:30; and a text edit meant to extend the drain had silently not applied. Lesson: a result that is too good is a bug until proven otherwise.
+
+## D-011 · Offline mode for policy experiments; live mode for systems experiments
+
+- **Date:** 2026-11-21
+- **Chose:** `cmd/offline` runs `world` + a dispatch `Policy` + an in-memory pool (`state.Mem`) in one goroutine on a fixed simulated clock. The dispatcher sees current positions (no ping delay). E2/E3 (and every policy comparison) run here. E1 (throughput, latency, backpressure) and the dashboard use the live path.
+- **Rejected:** Measuring policy quality on the live system.
+- **Why:** Live run 3 showed fleetd falling 7.3 s behind at ~82k pings/s, so live waits partly measure laptop speed. Offline runs are byte-identical for the same seed (verified with checksums) and ~200× faster (07:00–07:20 in 1.8 s vs 7 min live). The policy code is shared, so nothing is reimplemented.
+- **Known gap:** Offline has no information delay. If a policy's ranking could flip under delay, we test that live.

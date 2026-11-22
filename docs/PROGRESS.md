@@ -11,7 +11,8 @@ A running record of what was built, when, and what is next. Dates are real work 
 | 2. Download data, build replay day | ✅ 2026-11-20 |
 | 3. Event replayer → Kafka (`worldsim`) | ✅ 2026-11-20 |
 | 4. Go ingest, H3-keyed Kafka, Redis state (`fleetd`) | ✅ 2026-11-20 |
-| 5. Greedy nearest-driver dispatch + metrics | ✅ 2026-11-20 (live); offline mode next |
+| 5. Greedy nearest-driver dispatch + metrics | ✅ 2026-11-20 (live) |
+| 5b. Deterministic offline mode (`cmd/offline`) | ✅ 2026-11-21 |
 | 6. deck.gl dashboard (live + replay), Vercel | ⬜ |
 | 7. E1 load test, README + architecture diagram | ⬜ |
 
@@ -42,3 +43,16 @@ Reference for the same 07:00–07:20 window, real Uber/Lyft: **mean 381 s, p50 2
 - **Offline mode**: run `world` + `dispatch` in one deterministic process with an in-memory pool (no Kafka/Redis timing), for E2/E3 policy comparisons. The live path stays for E1 and the demo.
 - **E1 load test**: find the sustainable pings/s and the knee; then profile (Lua per ping vs. JSON decode vs. single consumer).
 - Dashboard (live + replay).
+
+## 2026-11-21
+- Offline mode (D-011): `internal/offline`, `state.Mem`, `cmd/offline`. Leg-end heap in `world`.
+- Determinism verified: identical SHA-1 for trips.csv and samples.csv across runs.
+- Profiling: ring search with early stop (offline tests 4.52 s → 0.61 s); fixed start-of-day spawn stacking.
+- 07:00–07:20 offline: p50 159 s / p90 579 s (live run 3: 153 / 536; real: 289 / 813), in 1.8 s vs 7 min live.
+- First full day (`bench/runs/fullday_u075`): median 216 s vs real 212 s overall, but rush hours collapse (wild goose chase; 18:00 p50 1,482 s vs 207 s real). Runtime 6m42s, dominated by the rush-hour pending queue.
+- Learning note 04.
+
+### Next
+1. Cap pickup ETA (real platforms do), then calibrate supply per hour so greedy reproduces the real hourly median waits.
+2. Skip re-searching unchanged pending requests (cuts rush-hour runtime).
+3. E1 load test on the live path.
