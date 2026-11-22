@@ -27,6 +27,8 @@ class TrainConfig:
     seed: int = 7
     max_train_rows: int = 0  # 0 = all
     evals_per_epoch: int = 4
+    hidden: int = 256
+    tag: str = "residual_mlp"  # results/e5_<tag>.json, models/eta_<tag>.pt
 
 
 @dataclass
@@ -112,7 +114,7 @@ def train(cfg: TrainConfig) -> dict:
     prep = fit_prep(train_df)
     tr, va, te = (tensors(d, prep, dev) for d in (train_df, val_df, test_df))
 
-    model = ResidualETA().to(dev)
+    model = ResidualETA(hidden=cfg.hidden).to(dev)
     opt = torch.optim.AdamW(model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
     n = len(tr["y"])
     steps_per_epoch = n // cfg.batch
