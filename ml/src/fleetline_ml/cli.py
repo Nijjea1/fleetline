@@ -59,3 +59,18 @@ def baselines() -> None:
             f"{name:24s} MAE {r['mae_s']:7.1f}s  MAPE {r['mape']:.3f}  "
             f"p90 {r['p90_abs_err_s']:7.1f}s  bias {r['bias_s']:+.1f}s"
         )
+
+
+@app.command()
+def train(
+    epochs: int = 4,
+    max_train_rows: int = typer.Option(0, help="subsample train rows (0 = all)"),
+) -> None:
+    """E5 part 2: train the residual MLP; write ml/results/e5_residual_mlp.json."""
+    from fleetline_ml.eta.train import TrainConfig
+    from fleetline_ml.eta.train import train as run
+
+    r = run(TrainConfig(epochs=epochs, max_train_rows=max_train_rows))
+    t, b = r["test"], r["test_base_B2"]
+    print(f"device {r['device']}  params {r['params']:,}  train {r['train_seconds']}s")
+    print(f"test MAE {t['mae_s']:.1f}s (base B2 {b['mae_s']:.1f}s)  p90 {t['p90_abs_err_s']:.1f}s")
