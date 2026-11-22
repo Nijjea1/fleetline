@@ -15,8 +15,7 @@ Fleetline replays a real day of NYC ride-hail demand, assigns every request to a
 | `sim/` | Data download, event replay, scenario configs (Python) |
 | `core/` | Go ingest, vehicle state, dispatch service |
 | `matcher/` | CPU baselines, CUDA kernel, pybind11 bindings |
-| `eta/` | ETA model training, ONNX/TensorRT export, C++ server |
-| `av/` | Robotaxi motion model (stretch) |
+| `ml/` | **All ML/AI work**: ETA model (OSRM baseline → LightGBM → PyTorch residual → ONNX/TensorRT), robotaxi motion model (stretch), their experiments (E5, E6, E8) |
 | `bench/` | Every experiment as a script, plus summarized results |
 | `infra/` | Docker Compose, Terraform, Kubernetes, CI |
 | `web/` | Next.js + deck.gl dashboard |
