@@ -7,9 +7,9 @@
 package world
 
 import (
+	"container/heap"
 	"fmt"
 	"math/rand/v2"
-	"sort"
 	"time"
 
 	"github.com/Nijjea1/fleetline/core/internal/geo"
@@ -58,6 +58,7 @@ type World struct {
 	byID     map[string]*Vehicle
 	waiting  map[int64]*waitingRider // requested, not yet assigned
 	expiryQ  []expiry                // sorted by deadline
+	legs     legHeap                 // active legs ordered by end time
 }
 
 type waitingRider struct {
@@ -132,6 +133,7 @@ func (w *World) startLeg(v *Vehicle, s model.VehicleStatus, fLat, fLon, tLat, tL
 	v.Status = s
 	v.FromLat, v.FromLon, v.ToLat, v.ToLon = fLat, fLon, tLat, tLon
 	v.LegStart, v.LegEnd = w.now, w.now+durMs
+	heap.Push(&w.legs, legEnd{at: v.LegEnd, v: v})
 }
 
 // Step is everything that happened during one Advance.
@@ -147,26 +149,24 @@ func (w *World) Advance(t int64) Step {
 	if t < w.now {
 		return out
 	}
-	// Leg completions between now and t, earliest first.
-	var due []*Vehicle
-	for _, v := range w.vehicles {
-		if v.Status != model.StatusIdle && v.LegEnd <= t {
-			due = append(due, v)
+	// Pop leg completions in global time order. A pickup immediately schedules the trip
+	// leg (another heap entry), so chained legs that both end before t are handled in
+	// the right order relative to every other vehicle. Cost is O(log n) per completion
+	// instead of scanning the whole fleet every step.
+	for w.legs.Len() > 0 && w.legs[0].at <= t {
+		e := heap.Pop(&w.legs).(legEnd)
+		if e.v.Status == model.StatusIdle || e.v.LegEnd != e.at {
+			continue // stale entry
 		}
-	}
-	sort.Slice(due, func(i, j int) bool {
-		if due[i].LegEnd != due[j].LegEnd {
-			return due[i].LegEnd < due[j].LegEnd
-		}
-		return due[i].ID < due[j].ID
-	})
-	for _, v := range due {
-		w.now = v.LegEnd
-		out.Events = append(out.Events, w.finishLeg(v, t)...)
+		w.now = e.at
+		out.Events = append(out.Events, w.finishLeg(e.v))
 	}
 	w.now = t
 	out.Events = append(out.Events, w.expire()...)
 
+	if w.cfg.PingInterval <= 0 {
+		return out // offline mode: nobody listens to pings
+	}
 	for _, v := range w.vehicles {
 		if v.nextPing > t {
 			continue
@@ -182,27 +182,62 @@ func (w *World) Advance(t int64) Step {
 	return out
 }
 
-// finishLeg handles arrival at pickup (start the trip) or dropoff (become idle).
-// A trip leg can also finish before t, so it loops.
-func (w *World) finishLeg(v *Vehicle, t int64) []model.TripEvent {
-	var ev []model.TripEvent
-	for v.Status != model.StatusIdle && v.LegEnd <= t {
-		w.now = v.LegEnd
-		switch v.Status {
-		case model.StatusEnRoute:
-			ev = append(ev, model.TripEvent{TripID: v.trip.TripID, VehicleID: v.ID, Type: model.TripPickup, TS: w.now})
-			delete(w.waiting, v.trip.TripID)
-			// Ride duration is the real one from the data, so dispatch only changes the wait.
-			w.startLeg(v, model.StatusOnTrip, v.trip.PickLat, v.trip.PickLon,
-				v.trip.DropLat, v.trip.DropLon, v.trip.TripTime*1000)
-		case model.StatusOnTrip:
-			ev = append(ev, model.TripEvent{TripID: v.trip.TripID, VehicleID: v.ID, Type: model.TripDropoff, TS: w.now})
-			v.Status = model.StatusIdle
-			v.FromLat, v.FromLon = v.ToLat, v.ToLon
-			v.trip = nil
-		}
+// finishLeg handles one arrival: at the pickup (start the trip) or at the dropoff
+// (become idle).
+func (w *World) finishLeg(v *Vehicle) model.TripEvent {
+	tripID := v.trip.TripID
+	if v.Status == model.StatusEnRoute {
+		delete(w.waiting, tripID)
+		// Ride duration is the real one from the data, so dispatch only changes the wait.
+		w.startLeg(v, model.StatusOnTrip, v.trip.PickLat, v.trip.PickLon,
+			v.trip.DropLat, v.trip.DropLon, v.trip.TripTime*1000)
+		return model.TripEvent{TripID: tripID, VehicleID: v.ID, Type: model.TripPickup, TS: w.now}
 	}
-	return ev
+	v.Status = model.StatusIdle
+	v.FromLat, v.FromLon = v.ToLat, v.ToLon
+	v.trip = nil
+	return model.TripEvent{TripID: tripID, VehicleID: v.ID, Type: model.TripDropoff, TS: w.now}
+}
+
+// AddVehicle puts a new idle vehicle into the world at the current time (a driver
+// logging on). The caller decides whether it is offered to the dispatcher.
+func (w *World) AddVehicle(v *Vehicle) {
+	v.Status = model.StatusIdle
+	v.LegStart, v.LegEnd = w.now, w.now
+	v.nextPing = w.now
+	w.vehicles = append(w.vehicles, v)
+	w.byID[v.ID] = v
+}
+
+// Vehicle looks up a vehicle by ID.
+func (w *World) Vehicle(id string) (*Vehicle, bool) {
+	v, ok := w.byID[id]
+	return v, ok
+}
+
+// legEnd is a heap entry: vehicle v's current leg ends at `at`.
+type legEnd struct {
+	at int64
+	v  *Vehicle
+}
+
+// legHeap is a min-heap by end time, tie-broken by vehicle ID for determinism.
+type legHeap []legEnd
+
+func (h legHeap) Len() int { return len(h) }
+func (h legHeap) Less(i, j int) bool {
+	if h[i].at != h[j].at {
+		return h[i].at < h[j].at
+	}
+	return h[i].v.ID < h[j].v.ID
+}
+func (h legHeap) Swap(i, j int) { h[i], h[j] = h[j], h[i] }
+func (h *legHeap) Push(x any)   { *h = append(*h, x.(legEnd)) }
+func (h *legHeap) Pop() any {
+	old := *h
+	x := old[len(old)-1]
+	*h = old[:len(old)-1]
+	return x
 }
 
 // expire removes riders whose patience ran out before anyone was assigned.

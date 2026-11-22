@@ -107,3 +107,37 @@ func TestSpawnFleetDeterministicWithAVShare(t *testing.T) {
 		t.Fatalf("want 10 AVs, got %d", av)
 	}
 }
+
+func TestEventsInGlobalTimeOrderAcrossVehicles(t *testing.T) {
+	// A: pickup at 360 s, ride 100 s -> dropoff at 460 s.
+	// B: pickup at 360 s too, but its ride is 50 s -> dropoff at 410 s.
+	// One big Advance must interleave them by time, not vehicle by vehicle.
+	a := &Vehicle{ID: "a", ToLat: 40, ToLon: -74}
+	b := &Vehicle{ID: "b", ToLat: 40, ToLon: -74}
+	w := New(testCfg(), 0, []*Vehicle{a, b})
+	w.Request(model.RideRequest{TripID: 1, PickLat: 40 + mileLat, PickLon: -74, DropLat: 40, DropLon: -74, TripTime: 100})
+	w.Request(model.RideRequest{TripID: 2, PickLat: 40 + mileLat, PickLon: -74, DropLat: 40, DropLon: -74, TripTime: 50})
+	_ = w.Assign(model.Assignment{TripID: 1, VehicleID: "a", Seq: 1})
+	_ = w.Assign(model.Assignment{TripID: 2, VehicleID: "b", Seq: 1})
+	ev := w.Advance(1_000_000).Events
+	if len(ev) != 4 {
+		t.Fatalf("want 4 events, got %+v", ev)
+	}
+	for i := 1; i < len(ev); i++ {
+		if ev[i].TS < ev[i-1].TS {
+			t.Fatalf("events out of order: %+v", ev)
+		}
+	}
+	if ev[2].TripID != 2 || ev[2].Type != model.TripDropoff {
+		t.Fatalf("B's earlier dropoff should come third: %+v", ev)
+	}
+}
+
+func TestOfflineModeEmitsNoPings(t *testing.T) {
+	cfg := testCfg()
+	cfg.PingInterval = 0
+	w := New(cfg, 0, SpawnFleet(10, 0, []Point{{Lat: 40, Lon: -74}}, 1))
+	if p := w.Advance(60_000).Pings; len(p) != 0 {
+		t.Fatalf("offline mode should not emit pings, got %d", len(p))
+	}
+}
