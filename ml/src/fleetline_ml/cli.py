@@ -28,3 +28,12 @@ def weather(start: str = "2026-09-01", end: str = "2026-09-30") -> None:
 
     df = w.fetch(start, end)
     print(f"{df.height} hours, rain hours: {(df['precipitation'] > 0).sum()} -> {w.write(df, start, end)}")
+
+
+@app.command()
+def dataset(month: str = "2026-09") -> None:
+    """Build train/val/test parquet files for the ETA model (split by date)."""
+    from fleetline_ml.eta import dataset as ds
+
+    for name, info in ds.build(month).items():
+        print(f"{name:5s} {info['rows']:>11,} rows over {info['days']} days")
