@@ -142,18 +142,17 @@ def train(cfg: TrainConfig) -> dict:
             step += 1
             if step % eval_every == 0:
                 mae = float(np.abs(predict(model, va) - y_val).mean())
+                l1 = float(loss.detach())
                 history.append(
                     {
                         "step": step,
                         "epoch": epoch,
-                        "train_l1": float(loss),
+                        "train_l1": l1,
                         "val_mae": mae,
                         "elapsed_s": round(time.time() - t0, 1),
                     }
                 )
-                print(
-                    f"epoch {epoch} step {step:6d}  train L1 {float(loss):6.1f}  val MAE {mae:6.1f}"
-                )
+                print(f"epoch {epoch} step {step:6d}  train L1 {l1:6.1f}  val MAE {mae:6.1f}")
                 if mae < best["mae"]:
                     best = {
                         "mae": mae,
@@ -167,7 +166,7 @@ def train(cfg: TrainConfig) -> dict:
     model.load_state_dict(best["state"])
     y_test = te["y"].cpu().numpy()
     result = {
-        "model": "residual_mlp",
+        "model": cfg.tag,
         "device": dev,
         "params": sum(p.numel() for p in model.parameters()),
         "config": asdict(cfg),
@@ -179,7 +178,10 @@ def train(cfg: TrainConfig) -> dict:
         "history": history,
     }
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
-    torch.save({"state_dict": best["state"], "prep": asdict(prep)}, MODELS_DIR / "eta_residual.pt")
+    torch.save(
+        {"state_dict": best["state"], "prep": asdict(prep), "hidden": cfg.hidden},
+        MODELS_DIR / f"eta_{cfg.tag}.pt",
+    )
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    (RESULTS_DIR / "e5_residual_mlp.json").write_text(json.dumps(result, indent=2) + "\n")
+    (RESULTS_DIR / f"e5_{cfg.tag}.json").write_text(json.dumps(result, indent=2) + "\n")
     return result

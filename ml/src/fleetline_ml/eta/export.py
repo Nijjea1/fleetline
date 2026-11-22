@@ -21,13 +21,14 @@ from fleetline_ml.eta.model import ResidualETA
 from fleetline_ml.eta.train import Prep, predict, tensors
 from fleetline_ml.paths import ETA_DIR, MODELS_DIR, RESULTS_DIR
 
-ONNX_PATH = MODELS_DIR / "eta_residual.onnx"
+TAG = "residual_mlp"  # which trained model to export (train --tag)
+ONNX_PATH = MODELS_DIR / f"eta_{TAG}.onnx"
 INPUTS = ["zones", "how", "cont", "base"]
 
 
 def load() -> tuple[ResidualETA, Prep]:
-    ckpt = torch.load(MODELS_DIR / "eta_residual.pt", weights_only=False)
-    model = ResidualETA()
+    ckpt = torch.load(MODELS_DIR / f"eta_{TAG}.pt", weights_only=False)
+    model = ResidualETA(hidden=ckpt.get("hidden", 256))
     model.load_state_dict(ckpt["state_dict"])
     return model.eval(), Prep(**ckpt["prep"])
 
@@ -78,7 +79,7 @@ def benchmark(batches=(1, 32, 256, 1024, 8192), reps: int = 200) -> dict:
     mps = None
     if torch.backends.mps.is_available():
         mps = {k: v.to("mps") for k, v in cpu.items()}
-        model_mps = ResidualETA().to("mps").eval()
+        model_mps = ResidualETA(hidden=model.mlp[0].out_features).to("mps").eval()
         model_mps.load_state_dict(model.state_dict())
 
     rows = []
