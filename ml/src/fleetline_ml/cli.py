@@ -74,3 +74,25 @@ def train(
     t, b = r["test"], r["test_base_B2"]
     print(f"device {r['device']}  params {r['params']:,}  train {r['train_seconds']}s")
     print(f"test MAE {t['mae_s']:.1f}s (base B2 {b['mae_s']:.1f}s)  p90 {t['p90_abs_err_s']:.1f}s")
+
+
+@app.command("export")
+def export_cmd() -> None:
+    """E6 (Mac part): export to ONNX, verify parity, benchmark PyTorch vs ONNX Runtime."""
+    from fleetline_ml.eta import export as ex
+
+    info = ex.export()
+    print(
+        f"exported {info['onnx']} ({info['size_mb']} MB), max |onnx - torch| = "
+        f"{info['max_abs_diff_s']:.2e} s"
+    )
+    bench = ex.benchmark()
+    for r in bench["latency"]:
+        print(
+            f"{r['runtime']:16s} batch {r['batch']:5d}  p50 {r['p50_ms']:7.3f} ms  "
+            f"p99 {r['p99_ms']:7.3f} ms  {r['rows_per_s']:>12,.0f} rows/s"
+        )
+    print(
+        f"test MAE pytorch {bench['test_mae_pytorch_s']:.2f}s  onnx {bench['test_mae_onnx_s']:.2f}s"
+    )
+    print("->", ex.write(info, bench))
