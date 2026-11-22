@@ -187,3 +187,49 @@ func TestSkipUnchangedGivesIdenticalDecisions(t *testing.T) {
 		t.Fatalf("tracking changed decisions: %d vs %d assignments", len(a), len(b))
 	}
 }
+
+// Regression: more idle cars than K near a crowd of riders. A rider whose K nearest cars
+// were all taken earlier in the same round must be retried next round even though no new
+// car appeared: an idle car beyond its top K still exists. The full-day A/B caught this.
+func TestSkipUnchangedRespectsTopKTruncation(t *testing.T) {
+	run := func(track bool) []model.Assignment {
+		mem := state.NewMem()
+		var pool Pool = mem
+		if !track {
+			pool = hidden{mem}
+		}
+		for i := 0; i < 6; i++ { // 6 cars around Times Square
+			mem.AddIdle("v"+strconv.Itoa(i), model.KindHuman, 40.7580+float64(i)*0.0005, -73.9855)
+		}
+		g := &Greedy{Travel: flatModel(), RadiusMi: 3, K: 2, MaxPickupSec: 900}
+		var pending []model.RideRequest
+		for i := 0; i < 6; i++ {
+			pending = append(pending, model.RideRequest{TripID: int64(i), PickLat: 40.7580, PickLon: -73.9855,
+				DropLat: 40.75, DropLon: -73.99})
+		}
+		var all []model.Assignment
+		for round := 0; round < 5; round++ {
+			as, _ := g.Dispatch(context.Background(), int64(round)*1000, pending, pool)
+			done := map[int64]bool{}
+			for _, a := range as {
+				done[a.TripID] = true
+			}
+			left := pending[:0]
+			for _, r := range pending {
+				if !done[r.TripID] {
+					left = append(left, r)
+				}
+			}
+			pending = left
+			all = append(all, as...)
+		}
+		return all
+	}
+	a, b := run(true), run(false)
+	if !reflect.DeepEqual(a, b) {
+		t.Fatalf("tracking changed decisions: %d vs %d assignments", len(a), len(b))
+	}
+	if len(b) != 6 {
+		t.Fatalf("all 6 riders should eventually get one of the 6 cars, got %d", len(b))
+	}
+}

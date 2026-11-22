@@ -154,8 +154,12 @@ func (g *Greedy) Dispatch(ctx context.Context, now int64, pending []model.RideRe
 		return nil, err
 	}
 	cands := make([][]state.Candidate, len(pending))
+	truncated := make([]bool, len(pending))
 	for qi, cs := range res {
 		cands[owner[qi]] = append(cands[owner[qi]], cs...)
+		if len(cs) >= g.K {
+			truncated[owner[qi]] = true // more idle cars may exist beyond the top K
+		}
 	}
 
 	// Phase 2: still greedy, oldest request first. A candidate may have been claimed by an
@@ -195,7 +199,11 @@ func (g *Greedy) Dispatch(ctx context.Context, now int64, pending []model.RideRe
 			})
 			break
 		}
-		if tracking && (len(out) == 0 || out[len(out)-1].TripID != r.TripID) {
+		// Only a search that saw *every* idle car in range proves the request hopeless
+		// until a new car appears. If the top-K list was full, a car beyond it may still
+		// be free next round, so don't memoize.
+		failed := len(out) == 0 || out[len(out)-1].TripID != r.TripID
+		if tracking && failed && !truncated[i] {
 			g.remember(r, at.Hour())
 		}
 	}
