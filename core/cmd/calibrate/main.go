@@ -37,6 +37,8 @@ type Iteration struct {
 	MeanAbsErr  float64     `json:"mean_abs_rel_err"`
 	MaxAbsErr   float64     `json:"max_abs_rel_err"`
 	Unserved    float64     `json:"unserved_rate"`
+	StepScale   float64     `json:"step_scale"`
+	Backtracked bool        `json:"backtracked,omitempty"`
 	RuntimeSec  float64     `json:"runtime_s"`
 }
 
@@ -81,6 +83,13 @@ func main() {
 	}
 	res := Output{Replay: filepath.Base(*replayPath), MaxPickup: maxPickup.String(), Seed: *seed, Damping: *damping, MaxStep: *maxStep}
 	best := math.Inf(1)
+	var bestU [24]float64
+	scale := 1.0 // shrinks when an iteration gets clearly worse (backtracking)
+	save := func() {
+		must(log, os.MkdirAll(filepath.Dir(*out), 0o755))
+		b, _ := json.MarshalIndent(res, "", "  ")
+		must(log, os.WriteFile(*out, append(b, '\n'), 0o644))
+	}
 	for it := 0; it < *iters; it++ {
 		uu := u
 		cfg := offline.Config{
@@ -95,8 +104,10 @@ func main() {
 		must(log, err)
 		sum := offline.Summarize(r)
 
-		itr := Iteration{Utilization: u, Unserved: sum.UnservedRate, RuntimeSec: r.Elapsed.Seconds()}
+		itr := Iteration{Utilization: u, Unserved: sum.UnservedRate, RuntimeSec: r.Elapsed.Seconds(), StepScale: scale}
 		n := 0.0
+		next := u
+		worst := 0
 		for _, hs := range sum.ByHour {
 			h := hs.Hour
 			itr.SimP50[h], itr.RealP50[h] = hs.Sim.P50, hs.Real.P50
@@ -106,29 +117,42 @@ func main() {
 			e := (hs.Sim.P50 - hs.Real.P50) / hs.Real.P50
 			itr.RelErr[h] = e
 			itr.MeanAbsErr += math.Abs(e)
-			itr.MaxAbsErr = math.Max(itr.MaxAbsErr, math.Abs(e))
+			if math.Abs(e) > itr.MaxAbsErr {
+				itr.MaxAbsErr, worst = math.Abs(e), h
+			}
 			n++
 			// Sim too slow (ratio < 1) -> lower utilization -> more drivers online.
 			// Bounded step: near the wild-goose-chase regime waits react very nonlinearly
 			// to supply, and unbounded steps made the first calibration oscillate
 			// (mean error 0.755 -> 0.564 -> 0.989).
 			ratio := hs.Real.P50 / hs.Sim.P50
-			step := clamp(math.Pow(ratio, *damping), 1-*maxStep, 1+*maxStep)
-			u[h] = clamp(u[h]*step, 0.3, 0.97)
+			ms := *maxStep * scale
+			step := clamp(math.Pow(ratio, *damping), 1-ms, 1+ms)
+			next[h] = clamp(u[h]*step, 0.3, 0.97)
 		}
 		itr.MeanAbsErr /= n
+		// Hours are coupled (drivers and backlog carry into the next hour), so a step
+		// that helps each hour alone can push the day into collapse. If this iteration
+		// is clearly worse than the best, go back to the best settings with half the step.
+		if itr.MeanAbsErr > best*1.10 {
+			itr.Backtracked = true
+			scale /= 2
+			u = bestU
+		} else {
+			if itr.MeanAbsErr < best {
+				best, bestU, res.Utilization, res.BestIter = itr.MeanAbsErr, itr.Utilization, itr.Utilization, it
+			}
+			u = next
+		}
 		u[0] = u[1] // hour 0 is warm-up only; follow hour 1
 		res.Iterations = append(res.Iterations, itr)
-		if itr.MeanAbsErr < best {
-			best, res.Utilization, res.BestIter = itr.MeanAbsErr, itr.Utilization, it
-		}
+		save()
 		log.Info("iteration", "i", it, "mean_abs_rel_err", fmt.Sprintf("%.3f", itr.MeanAbsErr),
-			"max_abs_rel_err", fmt.Sprintf("%.3f", itr.MaxAbsErr),
+			"max_abs_rel_err", fmt.Sprintf("%.3f", itr.MaxAbsErr), "worst_hour", worst,
+			"backtracked", itr.Backtracked, "step_scale", scale,
 			"unserved", fmt.Sprintf("%.4f", itr.Unserved), "runtime", r.Elapsed.Round(time.Second))
 	}
-	must(log, os.MkdirAll(filepath.Dir(*out), 0o755))
-	b, _ := json.MarshalIndent(res, "", "  ")
-	must(log, os.WriteFile(*out, append(b, '\n'), 0o644))
+	save()
 	log.Info("wrote", "file", *out, "best_iteration", res.BestIter, "mean_abs_rel_err", fmt.Sprintf("%.3f", best))
 }
 
