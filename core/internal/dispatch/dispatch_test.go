@@ -2,7 +2,9 @@ package dispatch
 
 import (
 	"context"
+	"reflect"
 	"sort"
+	"strconv"
 	"testing"
 
 	"github.com/Nijjea1/fleetline/core/internal/geo"
@@ -134,5 +136,54 @@ func TestGreedyPickupCap(t *testing.T) {
 	g.MaxPickupSec = 600
 	if as, _ := g.Dispatch(context.Background(), 0, []model.RideRequest{timesSq}, newMemPool(far)); len(as) != 1 {
 		t.Fatal("pickup under the cap should be assigned")
+	}
+}
+
+// hidden wraps a pool so the ChangeTracker capability is invisible to the policy.
+type hidden struct{ Pool }
+
+// The skip-unchanged optimization must never change a decision. Replay many rounds with
+// vehicles arriving over time, once with change tracking and once without.
+func TestSkipUnchangedGivesIdenticalDecisions(t *testing.T) {
+	run := func(track bool) []model.Assignment {
+		mem := state.NewMem()
+		var pool Pool = mem
+		if !track {
+			pool = hidden{mem}
+		}
+		g := &Greedy{Travel: flatModel(), RadiusMi: 3, K: 8, MaxPickupSec: 420}
+		var all []model.Assignment
+		var pending []model.RideRequest
+		for round := 0; round < 300; round++ {
+			// a new rider every round, a new idle car every third round, spread over Manhattan
+			f := float64(round%17) / 17
+			pending = append(pending, model.RideRequest{TripID: int64(round),
+				PickLat: 40.72 + 0.06*f, PickLon: -74.00 + 0.03*f, DropLat: 40.75, DropLon: -73.99})
+			if round%3 == 0 {
+				h := float64((round*7)%23) / 23
+				mem.AddIdle("v"+strconv.Itoa(round), model.KindHuman, 40.72+0.06*h, -74.0+0.03*h)
+			}
+			as, err := g.Dispatch(context.Background(), int64(round)*1000, pending, pool)
+			if err != nil {
+				t.Fatal(err)
+			}
+			done := map[int64]bool{}
+			for _, a := range as {
+				done[a.TripID] = true
+			}
+			left := pending[:0]
+			for _, r := range pending {
+				if !done[r.TripID] {
+					left = append(left, r)
+				}
+			}
+			pending = left
+			all = append(all, as...)
+		}
+		return all
+	}
+	a, b := run(true), run(false)
+	if len(a) == 0 || !reflect.DeepEqual(a, b) {
+		t.Fatalf("tracking changed decisions: %d vs %d assignments", len(a), len(b))
 	}
 }

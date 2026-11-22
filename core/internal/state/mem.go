@@ -20,6 +20,18 @@ type Mem struct {
 	kind  map[string]model.VehicleKind
 	seq   map[string]int64
 	count map[model.VehicleKind]int
+
+	// Change tracking: gen increments every time a vehicle becomes idle, and the log
+	// records where. A policy reads the log to learn which neighborhoods changed.
+	gen int64
+	log []Addition
+}
+
+// Addition is one vehicle becoming idle.
+type Addition struct {
+	Gen      int64
+	Kind     model.VehicleKind
+	Lat, Lon float64
 }
 
 type cellKey struct{ lat, lon int32 }
@@ -58,7 +70,28 @@ func (m *Mem) AddIdle(id string, kind model.VehicleKind, lat, lon float64) {
 	m.where[id] = k
 	m.kind[id] = kind
 	m.count[kind]++
+	m.gen++
+	m.log = append(m.log, Addition{Gen: m.gen, Kind: kind, Lat: lat, Lon: lon})
 }
+
+// Gen is the current change generation (increases whenever a vehicle becomes idle).
+func (m *Mem) Gen() int64 { return m.gen }
+
+// AdditionsSince returns vehicles that became idle after generation gen, and forgets
+// older entries (offline runs have exactly one reader, the dispatch policy).
+func (m *Mem) AdditionsSince(gen int64) []Addition {
+	i := sort.Search(len(m.log), func(i int) bool { return m.log[i].Gen > gen })
+	out := m.log[i:]
+	m.log = m.log[i:]
+	return out
+}
+
+// Cell exposes the grid cell of a point and the cell size, so policies can index their
+// own data (e.g. waiting riders) on the same grid.
+func Cell(lat, lon float64) (int32, int32) { k := keyOf(lat, lon); return k.lat, k.lon }
+
+// CellMi is the minimum side length of a grid cell in miles.
+const CellMi = cellMi
 
 // Remove takes a vehicle out of the idle pool (no-op if absent). Returns whether it was idle.
 func (m *Mem) Remove(id string) bool {

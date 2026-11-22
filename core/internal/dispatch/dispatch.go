@@ -43,6 +43,73 @@ type Greedy struct {
 	// cap, a shortage makes greedy send far-away cars; long pickup drives keep cars busy,
 	// which deepens the shortage: the "wild goose chase". Real platforms cap pickup ETAs.
 	MaxPickupSec float64
+
+	// Requests that found no vehicle, indexed by grid cell. A failed request can only
+	// succeed once a vehicle becomes idle near it, so each round we let the *new idle
+	// vehicles* mark nearby failed requests for a retry, instead of every failed
+	// request re-searching. Only used when the pool supports change tracking.
+	failed     map[int64]failedAttempt
+	failedCell map[[2]int32][]int64
+	lastGen    int64
+}
+
+type failedAttempt struct {
+	hour int // speeds change by hour, which can bring a car under the cap
+}
+
+// ChangeTracker is an optional Pool capability (state.Mem has it; Redis doesn't).
+type ChangeTracker interface {
+	Gen() int64
+	AdditionsSince(gen int64) []state.Addition
+}
+
+// skipUnchanged drops requests that failed before and have no new idle vehicle nearby.
+func (g *Greedy) skipUnchanged(tr ChangeTracker, pending []model.RideRequest, radius float64, hour int) []model.RideRequest {
+	if g.failed == nil {
+		g.failed, g.failedCell = map[int64]failedAttempt{}, map[[2]int32][]int64{}
+	}
+	// Mark failed requests within reach of each newly idle vehicle.
+	dirty := map[int64]bool{}
+	reach := int32(radius/state.CellMi) + 1
+	for _, a := range tr.AdditionsSince(g.lastGen) {
+		la, lo := state.Cell(a.Lat, a.Lon)
+		for dl := -reach; dl <= reach; dl++ {
+			for dn := -reach; dn <= reach; dn++ {
+				for _, id := range g.failedCell[[2]int32{la + dl, lo + dn}] {
+					dirty[id] = true
+				}
+			}
+		}
+	}
+	g.lastGen = tr.Gen()
+
+	prev := g.failed
+	g.failed, g.failedCell = make(map[int64]failedAttempt, len(prev)), map[[2]int32][]int64{}
+	kept := pending[:0:0]
+	for _, r := range pending {
+		if f, ok := prev[r.TripID]; ok && f.hour == hour && !dirty[r.TripID] {
+			g.remember(r, hour) // still hopeless; carry it forward
+			continue
+		}
+		kept = append(kept, r)
+	}
+	return kept
+}
+
+func (g *Greedy) remember(r model.RideRequest, hour int) {
+	g.failed[r.TripID] = failedAttempt{hour: hour}
+	la, lo := state.Cell(r.PickLat, r.PickLon)
+	g.failedCell[[2]int32{la, lo}] = append(g.failedCell[[2]int32{la, lo}], r.TripID)
+}
+
+// searchRadius shrinks the radius to what the pickup cap allows at this hour: a car
+// farther than cap x speed / detour (straight line) can never be under the cap.
+func (g *Greedy) searchRadius(at time.Time) float64 {
+	if g.MaxPickupSec <= 0 {
+		return g.RadiusMi
+	}
+	reach := g.MaxPickupSec * g.Travel.SpeedMPS(at) / g.Travel.DetourFactor
+	return min(g.RadiusMi, reach)
 }
 
 // Name implements Policy.
@@ -56,16 +123,25 @@ type option struct {
 // Dispatch implements Policy.
 func (g *Greedy) Dispatch(ctx context.Context, now int64, pending []model.RideRequest, pool Pool) ([]model.Assignment, error) {
 	at := time.UnixMilli(now).UTC()
+	radius := g.searchRadius(at)
 	var out []model.Assignment
+
+	// Skip requests that failed before and whose neighborhood hasn't gained a vehicle
+	// since. This doesn't change any decision, only avoids repeating a search that
+	// would return nothing new.
+	tracker, tracking := pool.(ChangeTracker)
+	if tracking {
+		pending = g.skipUnchanged(tracker, pending, radius, at.Hour())
+	}
 
 	// Phase 1: fetch candidates for every request in one batch (one Redis round trip).
 	var qs []state.Query
 	owner := make([]int, 0, len(pending)*2) // query index -> request index
 	for i, r := range pending {
-		qs = append(qs, state.Query{Kind: model.KindHuman, Lat: r.PickLat, Lon: r.PickLon, RadiusMi: g.RadiusMi, K: g.K})
+		qs = append(qs, state.Query{Kind: model.KindHuman, Lat: r.PickLat, Lon: r.PickLon, RadiusMi: radius, K: g.K})
 		owner = append(owner, i)
 		if AVEligible(r) {
-			qs = append(qs, state.Query{Kind: model.KindAV, Lat: r.PickLat, Lon: r.PickLon, RadiusMi: g.RadiusMi, K: g.K})
+			qs = append(qs, state.Query{Kind: model.KindAV, Lat: r.PickLat, Lon: r.PickLon, RadiusMi: radius, K: g.K})
 			owner = append(owner, i)
 		}
 	}
@@ -114,6 +190,9 @@ func (g *Greedy) Dispatch(ctx context.Context, now int64, pending []model.RideRe
 				ETASec: int64(o.eta), TS: now, Policy: g.Name(),
 			})
 			break
+		}
+		if tracking && (len(out) == 0 || out[len(out)-1].TripID != r.TripID) {
+			g.remember(r, at.Hour())
 		}
 	}
 	return out, nil
