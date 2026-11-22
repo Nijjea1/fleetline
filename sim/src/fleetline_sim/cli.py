@@ -52,3 +52,29 @@ def calibrate(
     print("mph by hour:", model["speed_mph_by_hour"])
     print("busy vehicles by hour:", model["busy_vehicles_by_hour"])
     print(f"-> {dest.name}")
+
+
+@app.command("zone-points")
+def zone_points() -> None:
+    """Write one routable point per taxi zone (used by the ETA model's OSRM matrix)."""
+    import polars as pl
+
+    from fleetline_sim.zones import load_zones, to_lonlat
+
+    z = load_zones(RAW_DIR / "taxi_zones.zip")
+    # representative_point is guaranteed to lie inside the polygon; a centroid of an
+    # L-shaped or coastal zone can land in the river.
+    pts = z.geometry.representative_point()
+    lon, lat = to_lonlat(pts.x.to_numpy(), pts.y.to_numpy())
+    out = pl.DataFrame(
+        {
+            "zone": z["LocationID"].to_numpy(),
+            "name": z["zone"].to_list(),
+            "borough": z["borough"].to_list(),
+            "lat": lat,
+            "lon": lon,
+        }
+    )
+    dest = DERIVED_DIR / "zone_points.parquet"
+    out.write_parquet(dest)
+    print(f"{out.height} zones -> {dest.name}")
