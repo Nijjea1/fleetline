@@ -123,3 +123,16 @@ func TestGreedyRespectsRadius(t *testing.T) {
 		t.Fatalf("vehicle beyond radius was assigned: %+v", as)
 	}
 }
+
+func TestGreedyPickupCap(t *testing.T) {
+	// ~1.3 road miles at 10 mph = ~470 s away.
+	far := state.Candidate{VehicleID: "far", Kind: model.KindHuman, Lat: 40.7580 + 1.0/69.05, Lon: -73.9855}
+	g := &Greedy{Travel: flatModel(), RadiusMi: 3, K: 5, MaxPickupSec: 300}
+	if as, _ := g.Dispatch(context.Background(), 0, []model.RideRequest{timesSq}, newMemPool(far)); len(as) != 0 {
+		t.Fatalf("pickup over the cap was assigned: %+v", as)
+	}
+	g.MaxPickupSec = 600
+	if as, _ := g.Dispatch(context.Background(), 0, []model.RideRequest{timesSq}, newMemPool(far)); len(as) != 1 {
+		t.Fatal("pickup under the cap should be assigned")
+	}
+}

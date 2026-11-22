@@ -41,6 +41,7 @@ type Params struct {
 	Policy      string  `json:"policy"`
 	RadiusMi    float64 `json:"radius_mi"`
 	K           int     `json:"k"`
+	MaxPickup   string  `json:"max_pickup"`
 	Supply      string  `json:"supply"`
 	Fleet       int     `json:"fleet,omitempty"`
 	Utilization float64 `json:"utilization,omitempty"`
@@ -60,6 +61,7 @@ func main() {
 	flag.StringVar(&p.Policy, "policy", "greedy", "dispatch policy: greedy")
 	flag.Float64Var(&p.RadiusMi, "radius", 3, "candidate search radius, miles")
 	flag.IntVar(&p.K, "k", 8, "candidates per vehicle kind")
+	flag.StringVar(&p.MaxPickup, "max-pickup", "0s", "reject matches with a longer pickup ETA (0s = no cap)")
 	flag.StringVar(&p.Supply, "supply", "data", "data (follow real busy curve) or fixed")
 	flag.IntVar(&p.Fleet, "fleet", 20000, "with -supply fixed: number of vehicles")
 	flag.Float64Var(&p.Utilization, "utilization", 0.75, "with -supply data: busy / online")
@@ -103,7 +105,7 @@ func run(ctx context.Context, log *slog.Logger, p Params, out string) error {
 		to = day.Add(24 * time.Hour).UnixMilli()
 	}
 	durs := map[string]time.Duration{}
-	for name, s := range map[string]string{"warmup": p.Warmup, "patience": p.Patience, "window": p.Window} {
+	for name, s := range map[string]string{"warmup": p.Warmup, "patience": p.Patience, "window": p.Window, "max-pickup": p.MaxPickup} {
 		d, err := time.ParseDuration(s)
 		if err != nil {
 			return fmt.Errorf("-%s: %w", name, err)
@@ -125,7 +127,8 @@ func run(ctx context.Context, log *slog.Logger, p Params, out string) error {
 	var policy dispatch.Policy
 	switch p.Policy {
 	case "greedy":
-		policy = &dispatch.Greedy{Travel: travel, RadiusMi: p.RadiusMi, K: p.K}
+		policy = &dispatch.Greedy{Travel: travel, RadiusMi: p.RadiusMi, K: p.K,
+			MaxPickupSec: durs["max-pickup"].Seconds()}
 	default:
 		return fmt.Errorf("unknown -policy %q", p.Policy)
 	}

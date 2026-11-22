@@ -39,6 +39,10 @@ type Greedy struct {
 	Travel   geo.TravelModel
 	RadiusMi float64 // only consider vehicles this close (straight line)
 	K        int     // candidates per vehicle kind
+	// MaxPickupSec rejects matches whose pickup ETA exceeds this (0 = no cap). Without a
+	// cap, a shortage makes greedy send far-away cars; long pickup drives keep cars busy,
+	// which deepens the shortage: the "wild goose chase". Real platforms cap pickup ETAs.
+	MaxPickupSec float64
 }
 
 // Name implements Policy.
@@ -80,9 +84,14 @@ func (g *Greedy) Dispatch(ctx context.Context, now int64, pending []model.RideRe
 	for i, r := range pending {
 		var opts []option
 		for _, c := range cands[i] {
-			if !taken[c.VehicleID] {
-				opts = append(opts, option{c, g.Travel.TravelSec(c.Lat, c.Lon, r.PickLat, r.PickLon, at)})
+			if taken[c.VehicleID] {
+				continue
 			}
+			eta := g.Travel.TravelSec(c.Lat, c.Lon, r.PickLat, r.PickLon, at)
+			if g.MaxPickupSec > 0 && eta > g.MaxPickupSec {
+				continue
+			}
+			opts = append(opts, option{c, eta})
 		}
 		// Stable tie-break on ID keeps runs reproducible.
 		sort.Slice(opts, func(i, j int) bool {
