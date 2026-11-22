@@ -56,3 +56,21 @@ Reference for the same 07:00–07:20 window, real Uber/Lyft: **mean 381 s, p50 2
 1. Cap pickup ETA (real platforms do), then calibrate supply per hour so greedy reproduces the real hourly median waits.
 2. Skip re-searching unchanged pending requests (cuts rush-hour runtime).
 3. E1 load test on the live path.
+
+## 2026-11-22
+**Dispatch / simulation**
+- Pickup-ETA cap (`-max-pickup`): ends the rush-hour wild goose chase. Sep 16 at utilization 0.75: no cap p90 1,370 s → cap 900 s p90 928 s (0.06% unserved) → cap 600 s p90 790 s (0.35% unserved). Real p90 550 s.
+- Skip-unchanged retries: a waiting rider re-searches only when a new idle car appears nearby. Full day 4m18s → 2m37s.
+- **Bug found by full-day A/B** (`-no-skip`): riders whose top-K cars were all claimed in one round were wrongly put to sleep. Fixed + regression test; full-day checksums now identical with and without the optimization (D-013). The earlier cap-600 numbers came from the buggy binary and were replaced.
+- Per-hour supply calibration (`cmd/calibrate`): v1 oscillated; v2 uses a damped, step-capped update. Re-running on the fixed binary.
+
+**ML (`ml/`)**
+- OSRM (NY + NJ, pinned snapshot) in Docker; 263×263 zone matrix; Sep 2026 hourly weather; dataset 13.8M / 1.9M / 4.1M rows split by date (D-012).
+- E5 test MAE: OSRM 515.7 s → × hour-of-week 314.4 s → **LightGBM 236.5 s** → residual MLP 266.1 s (wider/longer MLP 268.1 s, no better). LightGBM is the ETA model to beat.
+- E6 (Mac): ONNX export matches PyTorch (same test MAE). Batch 1: ONNX Runtime CPU 0.019 ms vs M5 GPU 0.324 ms; batch 8,192: GPU 1.9 ms. CPU large-batch numbers to be re-measured on an idle machine. TensorRT script ready for the RTX 5060 (not yet run).
+- Learning notes 05 (ETA) and 06 (cap, skip, calibration).
+
+### Next
+1. Finish calibration; validate on the held-out day Sep 23 (checklist A5/A6).
+2. E1 load test on the live path.
+3. Dashboard replay exporter.
