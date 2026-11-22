@@ -62,7 +62,9 @@ Reference for the same 07:00–07:20 window, real Uber/Lyft: **mean 381 s, p50 2
 - Pickup-ETA cap (`-max-pickup`): ends the rush-hour wild goose chase. Sep 16 at utilization 0.75: no cap p90 1,370 s → cap 900 s p90 928 s (0.06% unserved) → cap 600 s p90 790 s (0.35% unserved). Real p90 550 s.
 - Skip-unchanged retries: a waiting rider re-searches only when a new idle car appears nearby. Full day 4m18s → 2m37s.
 - **Bug found by full-day A/B** (`-no-skip`): riders whose top-K cars were all claimed in one round were wrongly put to sleep. Fixed + regression test; full-day checksums now identical with and without the optimization (D-013). The earlier cap-600 numbers came from the buggy binary and were replaced.
-- Per-hour supply calibration (`cmd/calibrate`): v1 oscillated; v2 uses a damped, step-capped update. Re-running on the fixed binary.
+- Per-hour supply calibration (`cmd/calibrate`): v1 oscillated; v2 damped + step-capped, still diverged after iteration 4; v3 adds **backtracking** (return to best, halve the step). Best mean per-hour error **0.191**, but only **10/18 hours** within ±15% (A5 not met). 17:00 collapses (+87%) while 19:00 and 22:00 run too fast (−62%, −51%).
+- Held-out Sep 23 with Sep 16's settings: whole day p50 **217 s vs real 208 s**, p90 **597 vs 546 s**, unserved 0.07%. Per hour only 8/18 within ±25% (A6 not met). The day-level distribution transfers; hour-level doesn't.
+- Diagnosis: supply is the only knob, waits are flat until a cliff (collapse), and most hours are *too fast* even at high utilization. Real waits include steps we don't simulate (driver accept/decline, re-dispatch). Decision pending: model an accept delay/decline rate (fitted, labeled as such) vs. relax A5/A6 to day-level targets.
 
 **ML (`ml/`)**
 - OSRM (NY + NJ, pinned snapshot) in Docker; 263×263 zone matrix; Sep 2026 hourly weather; dataset 13.8M / 1.9M / 4.1M rows split by date (D-012).

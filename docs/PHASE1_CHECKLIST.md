@@ -12,8 +12,8 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · 🖥️ needs the RTX
 | A2 | Reproducible replay day | `fleetline-sim prepare` → same seed gives a byte-identical parquet; cleaning counts printed | ✅ 635,294 trips |
 | A3 | Travel model from data | detour factor, hourly speed, busy vehicles by hour in `travel_model_*.json` | ✅ |
 | A4 | Deterministic offline simulator | Same seed → identical `trips.csv` checksum | ✅ |
-| A5 | Supply calibrated per hour | Greedy's simulated median wait within ±15% of real in every hour 06:00–23:00 on the calibration day | 🟡 |
-| A6 | Held-out validation day | Calibrated settings applied to a different weekday (Sep 23) stay within ±25% per hour; result committed | ⬜ |
+| A5 | Supply calibrated per hour | Greedy's simulated median wait within ±15% of real in every hour 06:00–23:00 on the calibration day | 🟡 10/18 hours; mean error 0.191 (`bench/calibration/sep16_cap600.json`) |
+| A6 | Held-out validation day | Calibrated settings applied to a different weekday (Sep 23) stay within ±25% per hour; result committed | 🟡 8/18 hours; whole day p50 217 vs 208 s, p90 597 vs 546 s (`bench/runs/heldout_sep23_cap600`) |
 
 ## B. Streaming core (Go)
 
