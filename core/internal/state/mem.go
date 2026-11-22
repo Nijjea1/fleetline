@@ -15,8 +15,9 @@ import (
 //
 // Not safe for concurrent use: offline runs are single-threaded by design.
 type Mem struct {
-	cells map[cellKey]map[string]Candidate
-	where map[string]cellKey // idle vehicle -> its cell
+	cells map[model.VehicleKind]map[cellKey]map[string]Candidate // indexed per kind
+	where map[string]cellKey                                     // idle vehicle -> its cell
+	kind  map[string]model.VehicleKind
 	seq   map[string]int64
 	count map[model.VehicleKind]int
 }
@@ -37,7 +38,8 @@ func keyOf(lat, lon float64) cellKey {
 // NewMem returns an empty pool.
 func NewMem() *Mem {
 	return &Mem{
-		cells: map[cellKey]map[string]Candidate{}, where: map[string]cellKey{},
+		cells: map[model.VehicleKind]map[cellKey]map[string]Candidate{},
+		where: map[string]cellKey{}, kind: map[string]model.VehicleKind{},
 		seq: map[string]int64{}, count: map[model.VehicleKind]int{},
 	}
 }
@@ -46,11 +48,15 @@ func NewMem() *Mem {
 func (m *Mem) AddIdle(id string, kind model.VehicleKind, lat, lon float64) {
 	m.Remove(id)
 	k := keyOf(lat, lon)
-	if m.cells[k] == nil {
-		m.cells[k] = map[string]Candidate{}
+	if m.cells[kind] == nil {
+		m.cells[kind] = map[cellKey]map[string]Candidate{}
 	}
-	m.cells[k][id] = Candidate{VehicleID: id, Kind: kind, Lat: lat, Lon: lon}
+	if m.cells[kind][k] == nil {
+		m.cells[kind][k] = map[string]Candidate{}
+	}
+	m.cells[kind][k][id] = Candidate{VehicleID: id, Kind: kind, Lat: lat, Lon: lon}
 	m.where[id] = k
+	m.kind[id] = kind
 	m.count[kind]++
 }
 
@@ -60,12 +66,14 @@ func (m *Mem) Remove(id string) bool {
 	if !ok {
 		return false
 	}
-	m.count[m.cells[k][id].Kind]--
-	delete(m.cells[k], id)
-	if len(m.cells[k]) == 0 {
-		delete(m.cells, k)
+	kind := m.kind[id]
+	m.count[kind]--
+	delete(m.cells[kind][k], id)
+	if len(m.cells[kind][k]) == 0 {
+		delete(m.cells[kind], k)
 	}
 	delete(m.where, id)
+	delete(m.kind, id)
 	return true
 }
 
@@ -88,33 +96,59 @@ func (m *Mem) IdleIDs() []string {
 // NearestIdle returns up to k idle vehicles of a kind within radiusMi, closest first.
 // Ties are broken by ID so results never depend on Go's random map order.
 func (m *Mem) NearestIdle(_ context.Context, kind model.VehicleKind, lat, lon, radiusMi float64, k int) ([]Candidate, error) {
+	if m.count[kind] == 0 {
+		return nil, nil
+	}
+	cells := m.cells[kind]
 	c := keyOf(lat, lon)
-	r := int32(math.Ceil(radiusMi/cellMi)) + 1
+	maxRing := int32(math.Ceil(radiusMi/cellMi)) + 1
 	var out []Candidate
-	for dl := -r; dl <= r; dl++ {
-		for dn := -r; dn <= r; dn++ {
-			for _, v := range m.cells[cellKey{c.lat + dl, c.lon + dn}] {
-				if v.Kind != kind {
-					continue
-				}
-				d := geo.HaversineMi(lat, lon, v.Lat, v.Lon)
-				if d <= radiusMi {
-					v.DistMi = d
-					out = append(out, v)
-				}
+	visit := func(key cellKey) {
+		for _, v := range cells[key] {
+			if d := geo.HaversineMi(lat, lon, v.Lat, v.Lon); d <= radiusMi {
+				v.DistMi = d
+				out = append(out, v)
 			}
 		}
 	}
-	sort.Slice(out, func(i, j int) bool {
-		if out[i].DistMi != out[j].DistMi {
-			return out[i].DistMi < out[j].DistMi
+	// Search outward one square ring of cells at a time. The query point sits inside the
+	// center cell, so every vehicle in ring d+1 is at least d*cellMi away. Once we hold k
+	// vehicles that are all closer than that, no farther ring can change the answer.
+	for d := int32(0); d <= maxRing; d++ {
+		if d == 0 {
+			visit(c)
+		} else {
+			for i := -d; i <= d; i++ {
+				visit(cellKey{c.lat - d, c.lon + i})
+				visit(cellKey{c.lat + d, c.lon + i})
+			}
+			for i := -d + 1; i <= d-1; i++ {
+				visit(cellKey{c.lat + i, c.lon - d})
+				visit(cellKey{c.lat + i, c.lon + d})
+			}
 		}
-		return out[i].VehicleID < out[j].VehicleID
-	})
+		if len(out) >= k {
+			sortCandidates(out)
+			if out[k-1].DistMi <= float64(d)*cellMi {
+				break
+			}
+		}
+	}
+	sortCandidates(out)
 	if len(out) > k {
 		out = out[:k]
 	}
 	return out, nil
+}
+
+// sortCandidates orders by distance, then ID so results never depend on map order.
+func sortCandidates(cs []Candidate) {
+	sort.Slice(cs, func(i, j int) bool {
+		if cs[i].DistMi != cs[j].DistMi {
+			return cs[i].DistMi < cs[j].DistMi
+		}
+		return cs[i].VehicleID < cs[j].VehicleID
+	})
 }
 
 // NearestIdleMany implements dispatch.Pool.
