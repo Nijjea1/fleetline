@@ -42,6 +42,7 @@ type Params struct {
 	RadiusMi    float64 `json:"radius_mi"`
 	K           int     `json:"k"`
 	MaxPickup   string  `json:"max_pickup"`
+	NoSkip      bool    `json:"no_skip,omitempty"`
 	Supply      string  `json:"supply"`
 	Fleet       int     `json:"fleet,omitempty"`
 	Utilization float64 `json:"utilization,omitempty"`
@@ -62,6 +63,7 @@ func main() {
 	flag.StringVar(&p.Policy, "policy", "greedy", "dispatch policy: greedy")
 	flag.Float64Var(&p.RadiusMi, "radius", 3, "candidate search radius, miles")
 	flag.IntVar(&p.K, "k", 8, "candidates per vehicle kind")
+	flag.BoolVar(&p.NoSkip, "no-skip", false, "disable the skip-unchanged dispatch optimization")
 	flag.StringVar(&p.MaxPickup, "max-pickup", "0s", "reject matches with a longer pickup ETA (0s = no cap)")
 	flag.StringVar(&p.Supply, "supply", "data", "data (follow real busy curve) or fixed")
 	flag.IntVar(&p.Fleet, "fleet", 20000, "with -supply fixed: number of vehicles")
@@ -145,7 +147,7 @@ func run(ctx context.Context, log *slog.Logger, p Params, out string) error {
 	switch p.Policy {
 	case "greedy":
 		policy = &dispatch.Greedy{Travel: travel, RadiusMi: p.RadiusMi, K: p.K,
-			MaxPickupSec: durs["max-pickup"].Seconds()}
+			MaxPickupSec: durs["max-pickup"].Seconds(), NoSkip: p.NoSkip}
 	default:
 		return fmt.Errorf("unknown -policy %q", p.Policy)
 	}

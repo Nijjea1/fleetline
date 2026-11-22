@@ -43,6 +43,9 @@ type Greedy struct {
 	// cap, a shortage makes greedy send far-away cars; long pickup drives keep cars busy,
 	// which deepens the shortage: the "wild goose chase". Real platforms cap pickup ETAs.
 	MaxPickupSec float64
+	// NoSkip disables the skip-unchanged optimization (for A/B checks that it changes
+	// nothing but speed).
+	NoSkip bool
 
 	// Requests that found no vehicle, indexed by grid cell. A failed request can only
 	// succeed once a vehicle becomes idle near it, so each round we let the *new idle
@@ -130,6 +133,7 @@ func (g *Greedy) Dispatch(ctx context.Context, now int64, pending []model.RideRe
 	// since. This doesn't change any decision, only avoids repeating a search that
 	// would return nothing new.
 	tracker, tracking := pool.(ChangeTracker)
+	tracking = tracking && !g.NoSkip
 	if tracking {
 		pending = g.skipUnchanged(tracker, pending, radius, at.Hour())
 	}
