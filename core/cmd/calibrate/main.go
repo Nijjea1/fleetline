@@ -46,6 +46,7 @@ type Output struct {
 	MaxPickup   string      `json:"max_pickup"`
 	Seed        uint64      `json:"seed"`
 	Damping     float64     `json:"damping"`
+	MaxStep     float64     `json:"max_step"`
 	Iterations  []Iteration `json:"iterations"`
 	Utilization [24]float64 `json:"utilization_by_hour"` // best iteration
 	BestIter    int         `json:"best_iteration"`
@@ -58,7 +59,8 @@ func main() {
 		maxPickup  = flag.Duration("max-pickup", 600*time.Second, "greedy pickup-ETA cap")
 		iters      = flag.Int("iters", 8, "calibration iterations")
 		start      = flag.Float64("start", 0.75, "initial utilization for every hour")
-		damping    = flag.Float64("damping", 0.5, "exponent on the wait ratio per step (1 = full step)")
+		damping    = flag.Float64("damping", 0.3, "exponent on the wait ratio per step (1 = full step)")
+		maxStep    = flag.Float64("max-step", 0.08, "max relative change of an hour's utilization per iteration")
 		seed       = flag.Uint64("seed", 7, "random seed")
 		out        = flag.String("out", "../bench/calibration/sep16.json", "output file")
 	)
@@ -77,7 +79,7 @@ func main() {
 	for h := range u {
 		u[h] = *start
 	}
-	res := Output{Replay: filepath.Base(*replayPath), MaxPickup: maxPickup.String(), Seed: *seed, Damping: *damping}
+	res := Output{Replay: filepath.Base(*replayPath), MaxPickup: maxPickup.String(), Seed: *seed, Damping: *damping, MaxStep: *maxStep}
 	best := math.Inf(1)
 	for it := 0; it < *iters; it++ {
 		uu := u
@@ -107,8 +109,12 @@ func main() {
 			itr.MaxAbsErr = math.Max(itr.MaxAbsErr, math.Abs(e))
 			n++
 			// Sim too slow (ratio < 1) -> lower utilization -> more drivers online.
+			// Bounded step: near the wild-goose-chase regime waits react very nonlinearly
+			// to supply, and unbounded steps made the first calibration oscillate
+			// (mean error 0.755 -> 0.564 -> 0.989).
 			ratio := hs.Real.P50 / hs.Sim.P50
-			u[h] = clamp(u[h]*math.Pow(ratio, *damping), 0.3, 0.97)
+			step := clamp(math.Pow(ratio, *damping), 1-*maxStep, 1+*maxStep)
+			u[h] = clamp(u[h]*step, 0.3, 0.97)
 		}
 		itr.MeanAbsErr /= n
 		u[0] = u[1] // hour 0 is warm-up only; follow hour 1
