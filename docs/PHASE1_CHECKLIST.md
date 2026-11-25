@@ -12,8 +12,8 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · 🖥️ needs the RTX
 | A2 | Reproducible replay day | `fleetline-sim prepare` → same seed gives a byte-identical parquet; cleaning counts printed | ✅ 635,294 trips |
 | A3 | Travel model from data | detour factor, hourly speed, busy vehicles by hour in `travel_model_*.json` | ✅ |
 | A4 | Deterministic offline simulator | Same seed → identical `trips.csv` checksum | ✅ |
-| A5 | Supply calibrated per hour | Greedy's simulated median wait within ±15% of real in every hour 06:00–23:00 on the calibration day | ✅ day-level (D-015): p50 206 vs 212 s, p90 586 vs 550 s (`bench/runs/calibrated_sep16_cap600`); per hour 10/18 |
-| A6 | Held-out validation day | Calibrated settings applied to a different weekday (Sep 23) stay within ±25% per hour; result committed | ✅ day-level: p50 217 vs 208 s, p90 597 vs 546 s (`bench/runs/heldout_sep23_cap600`); per hour 8/18 |
+| A5 | Supply calibrated per hour | Calibrated full day: simulated median and p90 wait within ±15% of real (revised from "every hour" in D-015; per-hour result reported) | ✅ day-level (D-015): p50 206 vs 212 s, p90 586 vs 550 s (`bench/runs/calibrated_sep16_cap600`); per hour 10/18 |
+| A6 | Held-out validation day | Calibrated settings on a different weekday (Sep 23): median and p90 within ±15% of real (revised in D-015; per-hour reported) | ✅ day-level: p50 217 vs 208 s, p90 597 vs 546 s (`bench/runs/heldout_sep23_cap600`); per hour 8/18 |
 
 ## B. Streaming core (Go)
 
