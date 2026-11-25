@@ -39,3 +39,13 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
+
+# CI (Linux) gets CPU-only PyTorch wheels; the RTX 5060 box installs the CUDA build
+# explicitly. macOS uses the default PyPI wheel (MPS support included).
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true

@@ -1,0 +1,54 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  go:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: core } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version-file: core/go.mod, cache-dependency-path: core/go.sum }
+      - name: gofmt
+        run: test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
+      - run: go vet ./...
+      - name: unit tests (race detector)
+        run: go test -race ./...
+
+  go-integration:
+    # Real Redpanda + Redis, the same images as infra/docker-compose.yml.
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: core } }
+    services:
+      redis:
+        image: redis:7.4-alpine
+        ports: ["6379:6379"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version-file: core/go.mod, cache-dependency-path: core/go.sum }
+      - name: start Redpanda
+        run: |
+          docker run -d --name redpanda -p 19092:19092 docker.redpanda.com/redpandadata/redpanda:v24.2.7 \
+            redpanda start --mode dev-container --smp 1 \
+            --kafka-addr internal://0.0.0.0:9092,external://0.0.0.0:19092 \
+            --advertise-kafka-addr internal://redpanda:9092,external://localhost:19092
+          for i in $(seq 1 30); do docker exec redpanda rpk cluster health 2>/dev/null | grep -q 'Healthy:.*true' && break; sleep 2; done
+      - run: go test -tags integration ./internal/bus/ ./internal/state/
+
+  python:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: { project: [sim, ml] }
+    defaults: { run: { working-directory: "${{ matrix.project }}" } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with: { enable-cache: true, cache-dependency-glob: "${{ matrix.project }}/uv.lock" }
+      - run: uv sync --locked
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run pytest -q
