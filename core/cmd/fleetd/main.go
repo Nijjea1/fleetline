@@ -53,6 +53,9 @@ type reqInfo struct {
 	warmup bool
 }
 
+// perPingScript: use the original one-Lua-call-per-ping ingest (E1 before/after).
+var perPingScript = flag.Bool("per-ping-script", false, "ingest with one Redis script call per ping (pre-E1 path)")
+
 func main() {
 	var (
 		brokers   = flag.String("brokers", "localhost:19092", "Kafka brokers")
@@ -85,6 +88,7 @@ func run(ctx context.Context, log *slog.Logger, brokers []string, redisAddr, mod
 		return err
 	}
 	store := state.New(redisAddr, 0)
+	store.PerPingScript = *perPingScript
 	defer store.Close()
 	if err := store.Ping(ctx); err != nil {
 		return err

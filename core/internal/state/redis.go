@@ -51,6 +51,43 @@ end
 return 1
 `)
 
+// applyPings is applyPing looped over a chunk: KEYS = veh1, idle1, veh2, idle2, ...;
+// ARGV = 8 values per ping in the same order. Returns one result per ping.
+//
+// Why: E1 showed Redis saturated at ~135k pings/s with one EVALSHA per ping costing
+// ~14 us, while the commands inside it cost ~3 us. Most of the time was per-call script
+// overhead, so one call per chunk amortizes it. Per-ping logic is identical to applyPing.
+var applyPings = redis.NewScript(`
+local out = {}
+for i = 1, #KEYS / 2 do
+  local vk, ik, o = KEYS[2*i-1], KEYS[2*i], (i-1)*8
+  local ts = tonumber(ARGV[o+5])
+  local cur = redis.call('HMGET', vk, 'ts', 'pending_seq')
+  if ts <= (tonumber(cur[1]) or -1) then
+    out[i] = 0
+  else
+    redis.call('HSET', vk, 'lat', ARGV[o+1], 'lon', ARGV[o+2], 'ts', ARGV[o+5],
+               'kind', ARGV[o+6], 'cell', ARGV[o+7])
+    if tonumber(ARGV[o+4]) < (tonumber(cur[2]) or 0) then
+      out[i] = 2
+    else
+      redis.call('HSET', vk, 'status', ARGV[o+3], 'seq', ARGV[o+4])
+      if ARGV[o+3] == 'idle' then
+        redis.call('GEOADD', ik, ARGV[o+2], ARGV[o+1], ARGV[o+8])
+      else
+        redis.call('ZREM', ik, ARGV[o+8])
+      end
+      out[i] = 1
+    end
+  end
+end
+return out
+`)
+
+// pingChunk is how many pings go into one script call. Large enough to amortize the
+// per-call overhead; small enough that one call doesn't block Redis for long (~1 ms).
+const pingChunk = 256
+
 // claim: KEYS = veh hash, idle geo set. ARGV = id. Returns new seq, or -1 if not idle.
 var claim = redis.NewScript(`
 if not redis.call('ZSCORE', KEYS[2], ARGV[1]) then
@@ -63,7 +100,11 @@ return seq
 `)
 
 // Store is the Redis-backed vehicle state.
-type Store struct{ rdb *redis.Client }
+type Store struct {
+	rdb *redis.Client
+	// PerPingScript selects the original one-Lua-call-per-ping ingest path (E1 A/B).
+	PerPingScript bool
+}
 
 // New connects to Redis at addr, using database db.
 func New(addr string, db int) *Store {
@@ -79,6 +120,48 @@ type Ping = model.Ping
 // ApplyPings writes a batch of pings in one network round trip (a Redis pipeline).
 // Batching is the main lever for ingest throughput; E1 measures it.
 func (s *Store) ApplyPings(ctx context.Context, pings []Ping) ([]PingResult, error) {
+	if s.PerPingScript {
+		return s.applyPingsPerPing(ctx, pings)
+	}
+	pipe := s.rdb.Pipeline()
+	var cmds []*redis.Cmd
+	for start := 0; start < len(pings); start += pingChunk {
+		chunk := pings[start:min(start+pingChunk, len(pings))]
+		keys := make([]string, 0, 2*len(chunk))
+		args := make([]any, 0, 8*len(chunk))
+		for _, p := range chunk {
+			keys = append(keys, vehKey(p.VehicleID), idleKey(p.Kind))
+			args = append(args, p.Lat, p.Lon, string(p.Status), p.Seq, p.TS, string(p.Kind),
+				geo.Cell(p.Lat, p.Lon, geo.CellRes), p.VehicleID)
+		}
+		cmds = append(cmds, applyPings.EvalSha(ctx, pipe, keys, args...))
+	}
+	if _, err := pipe.Exec(ctx); err != nil {
+		if !redis.HasErrorPrefix(err, "NOSCRIPT") {
+			return nil, err
+		}
+		// First call after Redis restarted: load the script, then retry once.
+		if err := applyPings.Load(ctx, s.rdb).Err(); err != nil {
+			return nil, err
+		}
+		return s.ApplyPings(ctx, pings)
+	}
+	out := make([]PingResult, 0, len(pings))
+	for _, c := range cmds {
+		vals, err := c.Int64Slice()
+		if err != nil {
+			return nil, err
+		}
+		for _, n := range vals {
+			out = append(out, PingResult(n))
+		}
+	}
+	return out, nil
+}
+
+// applyPingsPerPing is the original one-script-call-per-ping path, kept behind
+// Store.PerPingScript so E1 can measure both on the same binary.
+func (s *Store) applyPingsPerPing(ctx context.Context, pings []Ping) ([]PingResult, error) {
 	pipe := s.rdb.Pipeline()
 	cmds := make([]*redis.Cmd, len(pings))
 	for i, p := range pings {
@@ -91,11 +174,10 @@ func (s *Store) ApplyPings(ctx context.Context, pings []Ping) ([]PingResult, err
 		if !redis.HasErrorPrefix(err, "NOSCRIPT") {
 			return nil, err
 		}
-		// First call after Redis restarted: load the script, then retry once.
 		if err := applyPing.Load(ctx, s.rdb).Err(); err != nil {
 			return nil, err
 		}
-		return s.ApplyPings(ctx, pings)
+		return s.applyPingsPerPing(ctx, pings)
 	}
 	out := make([]PingResult, len(pings))
 	for i, c := range cmds {

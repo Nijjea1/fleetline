@@ -5,6 +5,7 @@ package state
 
 import (
 	"context"
+	"reflect"
 	"testing"
 
 	"github.com/Nijjea1/fleetline/core/internal/model"
@@ -142,5 +143,69 @@ func TestNearestIdleManyMatchesSingle(t *testing.T) {
 				t.Fatalf("query %d result %d differs", i, j)
 			}
 		}
+	}
+}
+
+// The chunked script (E1 fix) must behave exactly like the per-ping script: same result
+// per ping and the same final state, across chunk boundaries, with repeated vehicles,
+// stale timestamps and ping-before-ack in one batch.
+func TestChunkedIngestMatchesPerPing(t *testing.T) {
+	ctx := context.Background()
+	batch := make([]Ping, 0, 700)
+	for i := 0; i < 700; i++ {
+		id := "v" + string(rune('a'+i%37)) // 37 vehicles, each seen ~19 times
+		ts := int64(1000 + i*7%500)        // not monotonic: some pings arrive stale
+		st := []model.VehicleStatus{model.StatusIdle, model.StatusEnRoute, model.StatusOnTrip}[i%3]
+		p := ping(id, st, int64(i%4), ts)
+		p.Lat += float64(i) * 1e-5
+		batch = append(batch, p)
+	}
+	run := func(perPing bool) ([]PingResult, map[string]Vehicle, []Candidate) {
+		s := newTestStore(t)
+		s.PerPingScript = perPing
+		// Some vehicles have a pending assignment, so lower-seq pings are position-only.
+		for _, id := range []string{"va", "vb", "vc"} {
+			if _, err := s.ApplyPings(ctx, []Ping{ping(id, model.StatusIdle, 0, 1)}); err != nil {
+				t.Fatal(err)
+			}
+			if _, _, err := s.Claim(ctx, id, model.KindHuman); err != nil {
+				t.Fatal(err)
+			}
+		}
+		res, err := s.ApplyPings(ctx, batch)
+		if err != nil {
+			t.Fatal(err)
+		}
+		state := map[string]Vehicle{}
+		for _, p := range batch {
+			v, err := s.Get(ctx, p.VehicleID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			state[p.VehicleID] = v
+		}
+		idle, err := s.NearestIdle(ctx, model.KindHuman, 40.75, -73.99, 5, 100)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return res, state, idle
+	}
+	r1, s1, i1 := run(true)
+	r2, s2, i2 := run(false)
+	if !reflect.DeepEqual(r1, r2) {
+		t.Fatal("per-ping results differ")
+	}
+	if !reflect.DeepEqual(s1, s2) {
+		t.Fatal("final vehicle state differs")
+	}
+	if !reflect.DeepEqual(i1, i2) {
+		t.Fatal("idle index differs")
+	}
+	counts := map[PingResult]int{}
+	for _, r := range r2 {
+		counts[r]++
+	}
+	if counts[PingStale] == 0 || counts[PingApplied] == 0 || counts[PingPositionOnly] == 0 {
+		t.Fatalf("test should exercise every outcome, got %v", counts)
 	}
 }
