@@ -97,3 +97,11 @@ Reference for the same 07:00–07:20 window, real Uber/Lyft: **mean 381 s, p50 2
 1. On AC power: interleaved A/B (inline vs 4 workers) → final E1 numbers, README + resume bullet.
 2. RTX 5060: `matcher/gpu_smoke/run.sh` (F1/F2), then TensorRT (E6).
 3. Phase 2: accept/decline model, batched matching, CUDA matcher.
+
+## 2026-11-25
+**Final E1 A/B (on AC power; 3 interleaved pairs):** inline sustains 130k (3/3), 150k (2/3), peak 153k/s; 4 workers sustain 150k (3/3), 175k (2/3), peak **187.6k/s (+22%)**; p99 at 150k **242 → 46 ms**. Phase 1 done except E5 (repo public: user's call) and F (GPU machine).
+
+### Resume bullets (every number from a committed result file)
+- Built a real-time dispatch platform in Go on Kafka (Redpanda) and Redis that replays a full day of NYC Uber/Lyft demand (620k requests, 29k vehicles); profiled the ingest path and raised peak throughput **22% to 187k GPS pings/s** on one laptop while cutting p99 latency at 150k/s from **242 to 46 ms**.
+- Proved zero data loss under failure: Redis frozen 10 s or killed 5 s, the backlog buffers in Kafka (up to 511k pings) and drains with every ping applied; the fault test found and fixed a silent batch-drop bug.
+- Built a deterministic simulator calibrated against real trips (median wait **206 s vs real 212 s**; held-out day 217 vs 208 s) and a LightGBM ETA model cutting error **54% vs OSRM** (515.7 → 236.5 s MAE on 4.1M trips), plus a deck.gl dashboard rendering 29k live vehicles (5.8 MB replay, deployed on Vercel).

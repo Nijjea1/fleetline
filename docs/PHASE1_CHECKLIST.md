@@ -32,7 +32,7 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · 🖥️ needs the RTX
 | --- | --- | --- | --- |
 | C1 | Load generator | `bench/e1/` script ramps pings/s in steps without the dispatch loop's noise | ✅ `cmd/loadgen` (open loop) + `bench/e1/run.sh` |
 | C2 | Sustainable throughput found | Table of offered vs. achieved pings/s and p50/p99 ingest latency; "knee" identified | ✅ baseline knee: 130k sustained 3/3, 140k not (`bench/e1/results/baseline*.json`) |
-| C3 | Bottleneck profiled and fixed once | pprof + Redis stats show the bottleneck; one fix with before/after numbers | ✅ 2 profiles → chunked Lua (latency ½, ceiling ≈) → concurrent apply (ceiling ↑); final A/B 🟡 needs AC power |
+| C3 | Bottleneck profiled and fixed once | pprof + Redis stats show the bottleneck; one fix with before/after numbers | ✅ 2 profiles → chunked Lua (latency ½, ceiling ≈) → concurrent apply (ceiling ↑); A/B: peak 153k → 187.6k/s, p99 at 150k 242 → 46 ms |
 | C4 | Backpressure behavior | Measured what happens when Redpanda/Redis slows (lag grows, no data loss) | ✅ Redis frozen 10 s / down 5 s: lag peaks 511k / 244k, drains, 0 lost (`bench/e1/backpressure.png`) |
 | C5 | Spread, not one lucky run | ≥3 runs per config, spread reported | ✅ 3 runs per rate; interleaved A/B for before/after |
 | C6 | Chart in README | PNG generated from `bench/e1/results/` by a script | ✅ `bench/e1/plot.py` → `e1.png`, `backpressure.png` |
@@ -54,7 +54,7 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · 🖥️ needs the RTX
 | E1 | CI | GitHub Actions runs Go + Python unit tests on every push | ✅ Go (vet, race), Kafka+Redis integration, Python, dashboard build |
 | E2 | README | Pitch, architecture diagram, quick start, results with real numbers only | ✅ |
 | E3 | Architecture diagram | `docs/architecture.svg` (source checked in) | ✅ `docs/architecture.svg` |
-| E4 | Resume bullet (E1) | Bullet filled with the measured E1 numbers | 🟡 after the final A/B |
+| E4 | Resume bullet (E1) | Bullet filled with the measured E1 numbers | ✅ in PROGRESS 11-25 |
 | E5 | Repo public | User decides; secrets scan clean first | ⬜ your call; gitleaks scan clean (102 commits); personal email is in pyproject.toml + commit authors |
 
 ## F. GPU machine smoke test 🖥️

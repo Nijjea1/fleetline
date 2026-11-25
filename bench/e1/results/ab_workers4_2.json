@@ -1,0 +1,66 @@
+{
+  "label": "ab_workers4_2",
+  "started": "2026-11-25T04:46:49.628224Z",
+  "vehicles": 20000,
+  "step_s": 30,
+  "workers": 4,
+  "linger": "5ms",
+  "steps": [
+    {
+      "offered_rate": 130000,
+      "rep": 0,
+      "produced_per_s": 129956.67910430967,
+      "applied_per_s": 129914.34600580651,
+      "ingest_p50_ms": 23.83243243243243,
+      "ingest_p99_ms": 31.910810810810812,
+      "ingest_max_bucket_ms": 64,
+      "lag_end": 1270,
+      "drain_s": 0.204967166,
+      "mean_batch": 1277.8531147540984,
+      "stale_frac": 0,
+      "sustained": true
+    },
+    {
+      "offered_rate": 150000,
+      "rep": 0,
+      "produced_per_s": 149949.18512982034,
+      "applied_per_s": 149899.41981773893,
+      "ingest_p50_ms": 23.943869027731374,
+      "ingest_p99_ms": 31.92269963247578,
+      "ingest_max_bucket_ms": 128,
+      "lag_end": 1493,
+      "drain_s": 0.203523375,
+      "mean_batch": 1476.3969139855549,
+      "stale_frac": 0,
+      "sustained": true
+    },
+    {
+      "offered_rate": 175000,
+      "rep": 0,
+      "produced_per_s": 174942.42222440452,
+      "applied_per_s": 174881.6562562933,
+      "ingest_p50_ms": 24.71078610603291,
+      "ingest_p99_ms": 112.22153846153844,
+      "ingest_max_bucket_ms": 256,
+      "lag_end": 1823,
+      "drain_s": 0.201790417,
+      "mean_batch": 1712.3074412532637,
+      "stale_frac": 0,
+      "sustained": true
+    },
+    {
+      "offered_rate": 190000,
+      "rep": 0,
+      "produced_per_s": 189937.27373994884,
+      "applied_per_s": 187592.7711782116,
+      "ingest_p50_ms": 313.23799359658483,
+      "ingest_p99_ms": 511.5054855923159,
+      "ingest_max_bucket_ms": 1024,
+      "lag_end": 70336,
+      "drain_s": 0.406011084,
+      "mean_batch": 3800.03848750844,
+      "stale_frac": 0.028191192491209355,
+      "sustained": false
+    }
+  ]
+}

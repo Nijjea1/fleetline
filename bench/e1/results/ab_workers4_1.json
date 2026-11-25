@@ -1,0 +1,66 @@
+{
+  "label": "ab_workers4_1",
+  "started": "2026-11-25T04:37:21.342179Z",
+  "vehicles": 20000,
+  "step_s": 30,
+  "workers": 4,
+  "linger": "5ms",
+  "steps": [
+    {
+      "offered_rate": 130000,
+      "rep": 0,
+      "produced_per_s": 129957.38178635496,
+      "applied_per_s": 129914.91522367192,
+      "ingest_p50_ms": 23.190684133915575,
+      "ingest_p99_ms": 31.875167394468704,
+      "ingest_max_bucket_ms": 64,
+      "lag_end": 1274,
+      "drain_s": 0.202919416,
+      "mean_batch": 1280.3735216819973,
+      "stale_frac": 0,
+      "sustained": true
+    },
+    {
+      "offered_rate": 150000,
+      "rep": 0,
+      "produced_per_s": 149950.77344345057,
+      "applied_per_s": 149849.80742310444,
+      "ingest_p50_ms": 26.479663394109398,
+      "ingest_p99_ms": 384.69423728813547,
+      "ingest_max_bucket_ms": 512,
+      "lag_end": 3029,
+      "drain_s": 0.203755583,
+      "mean_batch": 1532.2164280845263,
+      "stale_frac": 0.00021888443235636878,
+      "sustained": true
+    },
+    {
+      "offered_rate": 175000,
+      "rep": 0,
+      "produced_per_s": 174942.068759698,
+      "applied_per_s": 173774.9503119879,
+      "ingest_p50_ms": 27.348303870043,
+      "ingest_p99_ms": 214.82901098901098,
+      "ingest_max_bucket_ms": 512,
+      "lag_end": 35014,
+      "drain_s": 0.203845334,
+      "mean_batch": 1722.2712256359432,
+      "stale_frac": 5.754495939723573e-7,
+      "sustained": false
+    },
+    {
+      "offered_rate": 190000,
+      "rep": 0,
+      "produced_per_s": 189936.55265964146,
+      "applied_per_s": 187523.57993966542,
+      "ingest_p50_ms": 371.16297010607525,
+      "ingest_p99_ms": 949.5630769230768,
+      "ingest_max_bucket_ms": 1024,
+      "lag_end": 72390,
+      "drain_s": 0.406262417,
+      "mean_batch": 4252.283446712018,
+      "stale_frac": 0.04976562323635285,
+      "sustained": false
+    }
+  ]
+}

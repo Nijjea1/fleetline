@@ -1,40 +1,89 @@
 # Fleetline
 
-Real-time dispatch for a mixed fleet of human drivers and robotaxis — GPU-accelerated matching, ML-predicted arrival times, and a benchmark behind every number.
+**Real-time ride dispatch for a mixed fleet of human drivers and robotaxis, replaying a real day of NYC Uber/Lyft demand.** Go streaming core on Kafka (Redpanda) + Redis, a deterministic simulator calibrated against real wait times, an ML arrival-time model, and a live map.
 
-> **Status:** Phase 1 (core) in progress. Numbers appear here only after a benchmark in `bench/` produces them.
+**▶ Live demo: [fleetline-sigma.vercel.app](https://fleetline-sigma.vercel.app)**: 29,087 vehicles serving 12,917 real ride requests, 08:00–08:20 on Wed Sep 16, 2026.
 
-## What it does
+![Architecture](docs/architecture.svg)
 
-Fleetline replays a real day of NYC ride-hail demand, assigns every request to a vehicle inside a fixed time budget, and measures whether each change makes the city better served.
+Every number below was produced by a script in this repo. Each links to its result file.
 
-## Repo layout
+## Results
 
-| Path | What lives there |
+### Streaming ingest (E1): how many vehicle pings/s one laptop sustains
+One M5 MacBook Pro, Docker Desktop (Redpanda + Redis), open-loop load generator, 3+ runs per rate.
+
+| Version | Sustained (runs) | Peak applied | p99 at 150k | What changed |
+| --- | --- | --- | --- | --- |
+| Baseline | 130k pings/s (3/3) | ~135k/s | (fails) | one Redis Lua call per ping, batches applied one at a time |
+| + chunked Lua ("inline") | 130k (3/3), 150k (2/3) | 153k/s | 242 ms | one Lua call per 256 pings: latency halves at 130k |
+| **+ concurrent apply (4 workers)** | **150k (3/3), 175k (2/3)** | **187.6k/s (+22%)** | **46 ms** | decode the next batch while Redis writes this one |
+
+The last two rows are an interleaved A/B (inline, workers, inline, workers…, 3 pairs, with cool-downs) so machine drift hits both equally.
+
+"Sustained" = fleetd applies ≥ 99% of what's offered with < 0.1 s of backlog at the end of a 30 s step. Ingest latency = broker append → state written in Redis (worst ping per batch). Profiles showed Redis's single core as the limit, then fleetd's serial loop leaving Redis idle. → [`bench/e1/`](bench/e1/), learning note [07](docs/learning/07-load-testing.md)
+
+![E1](bench/e1/e1.png)
+
+**Backpressure:** at 50k pings/s, freezing Redis for 10 s builds a 511k-ping backlog in Kafka that drains in ~8 s; stopping Redis for 5 s triggers retries. Both runs end with **applied = sent exactly (0 lost)**. The test found and fixed a bug where Redis errors silently dropped batches. → [`backpressure.png`](bench/e1/backpressure.png)
+
+### Simulator validity
+| Check | Result |
 | --- | --- |
-| `sim/` | Data download, event replay, scenario configs (Python) |
-| `core/` | Go ingest, vehicle state, dispatch service |
-| `matcher/` | CPU baselines, CUDA kernel, pybind11 bindings |
-| `ml/` | **All ML/AI work**: ETA model (OSRM baseline → LightGBM → PyTorch residual → ONNX/TensorRT), robotaxi motion model (stretch), their experiments (E5, E6, E8) |
-| `bench/` | Every experiment as a script, plus summarized results |
-| `infra/` | Docker Compose, Terraform, Kubernetes, CI |
-| `web/` | Next.js + deck.gl dashboard |
-| `docs/` | Scope, decisions, datasets, progress log, learning notes |
+| Determinism | same seed → byte-identical `trips.csv` (SHA-1) |
+| Calibration day (Sep 16) | median wait **206 s vs real 212 s**, p90 **586 vs 550 s**, 0.10% unserved |
+| Speed | a full day (620k requests, ~22k cars, 1 s steps) in **2m37s** offline |
+| Held-out day (calibrated on Sep 16, tested on Sep 23) | median wait **217 s vs real 208 s**, p90 **597 vs 546 s** |
+| Pickup-ETA cap (stops the "wild goose chase") | p90 wait **1,370 s → 790 s** on the same day |
+| Known gap | per hour only 10/18 hours within ±15%: real waits include driver accept/decline time we don't model yet ([D-015](docs/DECISIONS.md)) |
 
-## Docs
+### ETA model (E5/E6), 4.1M held-out trips
+| Model | Mean abs. error |
+| --- | --- |
+| OSRM road-graph time (no traffic) | 515.7 s |
+| × hour-of-week traffic factor | 314.4 s |
+| **LightGBM** | **236.5 s** (−54% vs OSRM) |
+| Residual MLP (PyTorch, DeepETA-style) | 266.1 s: loses to LightGBM; wider/longer training didn't help |
 
-- [Project scope](docs/PROJECT_SCOPE.md)
-- [Progress log](docs/PROGRESS.md)
-- [Decision log](docs/DECISIONS.md)
-- [Datasets](docs/DATASETS.md)
-- [Learning notes](docs/learning/)
+ONNX export matches PyTorch exactly (same test MAE); ONNX Runtime CPU 0.009 ms at batch 1, M5 GPU 2× faster than CPU at batch 8,192. → [`ml/`](ml/)
 
-## Quick start (so far)
+### Bugs the benchmarks caught
+- **A "6× better than Uber" demo** that was a warm-up artifact (fleet still idle at 08:00).
+- **A 0.01 s median wait**: a data leak (cars spawned where future riders would appear).
+- **An optimization that changed answers**: a full-day A/B with the optimization off found riders wrongly skipped; a 2-hour test had passed.
+- **A benchmark that drifted**: after 25 min of saturation every Redis op cost 2×. Runs are now interleaved A/B with cool-downs.
+
+## How it works
+
+- **The city** (`core/internal/world`, `cmd/worldsim`): replays each real request at its real time and place, drives cars along road-distance-calibrated legs, sends a GPS ping every 4 s. ~10% of the fleet are robotaxis that only serve trips inside a Manhattan geofence.
+- **The system** (`cmd/fleetd`): consumes pings and requests from Kafka (partitioned by H3 cell), keeps vehicle state in Redis with Lua guards against out-of-order pings and double assignment, and runs a dispatch round every second of event time.
+- **Offline mode** (`cmd/offline`): the same dispatch code in one deterministic process, for calibration and policy experiments without laptop timing noise.
+- **Dashboard** (`web/`): replay mode (static files, the public demo) and live mode (polls fleetd).
+
+## Run it
 
 ```bash
-cd sim
-uv run fleetline-sim download            # ~510 MB: Sep 2026 Uber/Lyft trips + zone shapes
-uv run fleetline-sim prepare             # builds data/derived/day_2026-09-16_seed7.parquet
-uv run pytest
-make up                                  # from repo root: Redpanda, Console (localhost:8080), Redis
+# data: Sep 2026 Uber/Lyft trips (~510 MB) -> one replay day + travel model
+cd sim && uv run fleetline-sim download && uv run fleetline-sim prepare && uv run fleetline-sim calibrate && cd ..
+
+make demo                      # Redpanda + Redis + fleetd + worldsim, live; stats at localhost:9100/stats
+cd web && npm i && npm run dev # dashboard at localhost:3000 (Live tab shows the running demo)
+
+make test                      # Go + Python unit tests (CI also runs Kafka/Redis integration tests)
+bench/e1/ab.sh 3               # E1 load test, interleaved A/B
 ```
+
+Requires Go, Docker, [uv](https://docs.astral.sh/uv/), Node.
+
+## Repo
+
+| Path | |
+| --- | --- |
+| `core/` | Go: world, dispatch, state (Redis + in-memory), offline simulator, fleetd, worldsim, load generator |
+| `sim/` | Python: data download, cleaning, travel-model calibration |
+| `ml/` | ETA model: OSRM, LightGBM, PyTorch, ONNX, TensorRT script |
+| `bench/` | Every experiment's script and results |
+| `web/` | Next.js + deck.gl dashboard |
+| `docs/` | [Scope](docs/PROJECT_SCOPE.md) · [Decisions](docs/DECISIONS.md) · [Progress](docs/PROGRESS.md) · [Phase 1 checklist](docs/PHASE1_CHECKLIST.md) · [Learning notes](docs/learning/) |
+
+Data: [NYC TLC trip records](https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page) (High-Volume FHV), OpenStreetMap via Geofabrik, Open-Meteo.

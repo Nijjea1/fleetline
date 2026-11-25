@@ -15,7 +15,9 @@ How many vehicle pings per second can fleetd take (Kafka → decode → Redis) o
 | --- | --- | --- |
 | Baseline: 1 Lua call per ping, batches applied serially | 130k pings/s | 47 / 112 ms |
 | + 256 pings per Lua call | 130k pings/s | 28 / 64 ms |
-| + 4 concurrent apply workers | see README (interleaved A/B) | |
+| + 4 concurrent apply workers | **150k (3/3), 175k (2/3)** | 25 / 112 ms at 175k |
+
+Final interleaved A/B (3 pairs): peak applied **153k → 187.6k pings/s (+22%)**; at 150k, p99 **242 → 46 ms**. Inline's result varied run to run (150k passed 2/3); the workers version was steadier, and that's a finding too.
 
 ### Fix 1 helped latency, not throughput, and that's the lesson
 The first profile looked like "Redis spends its time on script-call overhead", so we batched 256 pings into each call. Latency halved, but the ceiling barely moved. Re-profiling (with Redis's counters **reset first**) showed why:
