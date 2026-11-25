@@ -16,6 +16,9 @@ var (
 		Name: "fleetline_pings_total", Help: "Vehicle pings processed, by result.",
 	}, []string{"result"})
 
+	IngestRetries = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "fleetline_ingest_retries_total", Help: "Failed Redis ping writes that were retried.",
+	})
 	IngestLatency = promauto.NewHistogram(prometheus.HistogramOpts{
 		Name: "fleetline_ingest_latency_seconds",
 		Help: "Wall time from broker append to the ping being applied in Redis.",

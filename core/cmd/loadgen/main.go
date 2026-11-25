@@ -58,6 +58,16 @@ type Output struct {
 	Workers  int       `json:"workers"`
 	Linger   string    `json:"linger"`
 	Steps    []Step    `json:"steps"`
+	// Timeline: one sample per second across the whole run (-timeline), for watching
+	// backpressure: lag building while a dependency is slow, then draining.
+	Timeline []Sample `json:"timeline,omitempty"`
+}
+
+type Sample struct {
+	T       float64 `json:"t_s"`
+	Sent    int64   `json:"sent"`
+	Applied int64   `json:"applied"`
+	Lag     int64   `json:"lag"`
 }
 
 func main() {
@@ -73,6 +83,7 @@ func main() {
 		label    = flag.String("label", "baseline", "result name: bench/e1/results/<label>.json")
 		outDir   = flag.String("out", "../bench/e1/results", "output directory")
 		cooldown = flag.Duration("cooldown", 0, "idle time after each step (lets a laptop's CPUs recover)")
+		timeline = flag.Bool("timeline", false, "record sent/applied/lag every second")
 	)
 	flag.Parse()
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
@@ -107,6 +118,26 @@ func main() {
 	stable := waitStable(ctx, *metrics)
 	base := stable - float64(g.sent.Load())
 	log.Info("warm-up done", "sent", g.sent.Load(), "unread_at_start", int64(-base))
+
+	if *timeline {
+		t0 := time.Now()
+		var mu sync.Mutex
+		go func() {
+			for ctx.Err() == nil {
+				time.Sleep(time.Second)
+				s, err := scrape(*metrics)
+				if err != nil {
+					continue // fleetd's HTTP may stall too; just skip the sample
+				}
+				sent := g.sent.Load()
+				applied := int64(s.processed - base)
+				mu.Lock()
+				out.Timeline = append(out.Timeline, Sample{T: round(time.Since(t0).Seconds()), Sent: sent, Applied: applied, Lag: sent - applied})
+				mu.Unlock()
+			}
+		}()
+		defer func() { mu.Lock(); save(log, *outDir, out); mu.Unlock() }()
+	}
 
 	for rep := 0; rep < *reps; rep++ {
 		for _, rate := range rates {
@@ -253,6 +284,11 @@ func scrape(url string) (snap, error) {
 		name := line[:sp]
 		switch {
 		case strings.HasPrefix(name, "fleetline_pings_total{"):
+			// Only outcomes where the ping reached Redis count as processed; "error"
+			// (old fleetd versions dropped failed batches) and "bad" (undecodable) don't.
+			if strings.Contains(name, `"error"`) || strings.Contains(name, `"bad"`) {
+				continue
+			}
 			s.processed += v
 			if strings.Contains(name, `"stale"`) {
 				s.stale += v

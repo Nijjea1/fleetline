@@ -209,11 +209,20 @@ func (s *server) handleBatch(msgs []bus.Message) {
 // apply writes one ping batch to Redis and records ingest metrics.
 func (s *server) apply(b pingBatch) {
 	pings, oldest := b.pings, b.oldest
-	res, err := s.store.ApplyPings(context.Background(), pings)
-	if err != nil {
-		s.log.Error("apply pings", "err", err)
-		metrics.PingsTotal.WithLabelValues("error").Add(float64(len(pings)))
-		return
+	// If Redis is down or slow, retry with backoff instead of dropping the batch. The
+	// worker blocks, the queue fills, the consumer stops polling, and the backlog waits
+	// in Kafka: lag grows, nothing is lost (E1 / C4). Re-applying a batch is safe: the
+	// timestamp guard turns duplicates into "stale".
+	var res []state.PingResult
+	for backoff := 50 * time.Millisecond; ; backoff = min(2*backoff, 2*time.Second) {
+		var err error
+		res, err = s.store.ApplyPings(context.Background(), pings)
+		if err == nil {
+			break
+		}
+		metrics.IngestRetries.Inc()
+		s.log.Warn("apply pings failed, retrying", "err", err, "backoff", backoff)
+		time.Sleep(backoff)
 	}
 	now := time.Now()
 	for i, r := range res {
