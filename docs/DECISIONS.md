@@ -100,3 +100,19 @@ Short architecture decision records. Each entry: what we chose, what we rejected
 - **Chose:** Every performance shortcut in the simulator ships with a flag that turns it off (`-no-skip`). It's accepted only if a **full-day** run gives the same trips.csv checksum both ways.
 - **Rejected:** Comparing old vs. new binaries; validating on a short window only.
 - **Why:** A short-window A/B passed, but the full-day A/B exposed a real bug (top-K truncation, see learning note 06). Comparing two binaries had given a false alarm: an unrelated refactor shifted the driver target by one car in 6 of 1,481 minutes, which changes the whole chaotic trajectory.
+
+## D-014 · Ingest: chunked Lua + concurrent apply workers; pings may be dropped on a crash
+
+- **Date:** 2026-11-24
+- **Chose:** fleetd applies pings with one Redis script call per 256-ping chunk, from 4 concurrent workers fed by a bounded queue (`-ingest-workers 4`). The old paths stay behind flags (`-per-ping-script`, `-ingest-workers 0`) for A/B runs.
+- **Rejected (for now):** sharding Redis or keeping vehicle state in fleetd's memory. Both are the next steps if one Redis core becomes the limit again.
+- **Why:** E1 profiles (see learning note 07). Chunking cut latency at 130k pings/s by ~half but barely moved the ceiling; Redis was only ~82% busy because fleetd decoded and waited serially. Overlapping decode with Redis writes raised the sustainable rate (numbers in `bench/e1/`).
+- **Trade-off:** offsets are auto-committed when polled, so after a crash up to 4 queued batches (~20k pings) could be lost. Acceptable for pings only: every vehicle pings every 4 s, so lost state heals within seconds, and cross-batch reordering is already handled by the per-vehicle timestamp guard (D-008). Ride requests and trip events are still handled synchronously.
+
+## D-015 · Phase 1 calibration target: whole-day wait distribution, not every hour
+
+- **Date:** 2026-11-24
+- **Chose:** A5/A6 pass on the **day-level** wait distribution (median and p90 within 15% on the held-out day). Per-hour errors are reported alongside, not hidden.
+- **Rejected (for Phase 1):** adding a fitted driver accept/decline model to chase per-hour targets.
+- **Why:** With supply as the only knob, per-hour calibration plateaus at 10/18 hours (best mean error 0.191) because waits are flat until a cliff and hours are coupled. Most hours are *too fast*, consistent with real waits including accept/decline time the simulator doesn't model. That model has no ground truth in the public data, so it would be a fitted assumption; it's the first item for Phase 2. The day-level distribution already transfers to an unseen day (Sep 23: p50 217 vs 208 s, p90 597 vs 546 s).
+- **Consequence:** policy comparisons are valid *relative to each other* on the same simulator; absolute wait numbers are not claimed to match reality hour by hour.
