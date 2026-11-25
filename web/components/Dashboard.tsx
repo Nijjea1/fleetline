@@ -16,7 +16,10 @@ const PICKUP_FADE_S = 25;
 type Mode = "replay" | "live";
 
 export default function Dashboard() {
-  const [mode, setMode] = useState<Mode>("replay");
+  // ?mode=live opens live mode directly (shareable, and scriptable for screenshots).
+  const [mode, setMode] = useState<Mode>(() =>
+    typeof window !== "undefined" && new URLSearchParams(window.location.search).get("mode") === "live" ? "live" : "replay",
+  );
   return (
     <main className="shell">
       {mode === "replay" ? <ReplayView mode={mode} setMode={setMode} /> : <LiveView mode={mode} setMode={setMode} />}
