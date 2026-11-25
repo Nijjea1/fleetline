@@ -50,6 +50,11 @@ type Params struct {
 	SupplyFile  string  `json:"supply_file,omitempty"`
 	AVShare     float64 `json:"av_share"`
 	Seed        uint64  `json:"seed"`
+	// Driver offers (D-017). Empty / zero = off: instant acceptance.
+	OfferDelay    string  `json:"offer_delay,omitempty"`
+	DeclineBase   float64 `json:"decline_base,omitempty"`
+	DeclinePerMin float64 `json:"decline_per_min,omitempty"`
+	DeclineMax    float64 `json:"decline_max,omitempty"`
 }
 
 func main() {
@@ -73,6 +78,10 @@ func main() {
 	flag.StringVar(&p.SupplyFile, "supply-file", "", "with -supply data: per-hour utilization from cmd/calibrate")
 	flag.Float64Var(&p.AVShare, "av-share", 0.1, "fraction of new drivers that are robotaxis")
 	flag.Uint64Var(&p.Seed, "seed", 7, "random seed (fleet placement, log-offs)")
+	flag.StringVar(&p.OfferDelay, "offer-delay", "", "human drivers take this long to answer an offer (e.g. 10s; empty = instant)")
+	flag.Float64Var(&p.DeclineBase, "decline-base", 0, "probability a driver declines an offer with a 0-minute pickup")
+	flag.Float64Var(&p.DeclinePerMin, "decline-per-min", 0, "added decline probability per minute of pickup ETA")
+	flag.Float64Var(&p.DeclineMax, "decline-max", 0, "cap on decline probability (0 = 0.95)")
 	out := flag.String("out", "", "output directory (required)")
 	flag.Parse()
 
@@ -111,7 +120,10 @@ func run(ctx context.Context, log *slog.Logger, p Params, out string) error {
 		to = day.Add(24 * time.Hour).UnixMilli()
 	}
 	durs := map[string]time.Duration{}
-	for name, s := range map[string]string{"warmup": p.Warmup, "patience": p.Patience, "window": p.Window, "max-pickup": p.MaxPickup} {
+	for name, s := range map[string]string{"warmup": p.Warmup, "patience": p.Patience, "window": p.Window, "max-pickup": p.MaxPickup, "offer-delay": p.OfferDelay} {
+		if s == "" {
+			continue
+		}
 		d, err := time.ParseDuration(s)
 		if err != nil {
 			return fmt.Errorf("-%s: %w", name, err)
@@ -160,6 +172,8 @@ func run(ctx context.Context, log *slog.Logger, p Params, out string) error {
 		Travel: travel, Policy: policy, From: from, To: to,
 		Warmup: durs["warmup"], Patience: durs["patience"], Window: durs["window"],
 		Drain: 30 * time.Minute, Supply: supply, AVShare: p.AVShare, Seed: p.Seed,
+		Offers: offline.Offers{Delay: durs["offer-delay"], DeclineBase: p.DeclineBase,
+			DeclinePerMin: p.DeclinePerMin, DeclineMax: p.DeclineMax},
 	}
 	log.Info("running", "from", p.From, "to", p.To, "policy", p.Policy, "supply", p.Supply,
 		"utilization", p.Utilization, "seed", p.Seed)
@@ -171,7 +185,7 @@ func run(ctx context.Context, log *slog.Logger, p Params, out string) error {
 	log.Info("done", "requests", sum.Requests, "unserved_rate", fmt.Sprintf("%.4f", sum.UnservedRate),
 		"sim_p50", fmt.Sprintf("%.0f", sum.Sim.P50), "real_p50", fmt.Sprintf("%.0f", sum.Real.P50),
 		"sim_p90", fmt.Sprintf("%.0f", sum.Sim.P90), "real_p90", fmt.Sprintf("%.0f", sum.Real.P90),
-		"runtime", res.Elapsed.Round(time.Millisecond))
+		"decline_rate", fmt.Sprintf("%.3f", sum.DeclineRate), "runtime", res.Elapsed.Round(time.Millisecond))
 	return write(out, p, sum, res)
 }
 

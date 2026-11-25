@@ -101,6 +101,12 @@ func (w *World) Request(r model.RideRequest) {
 // Assign applies a dispatcher decision at the current time. It returns an error for
 // assignments the world can't honor; the vehicle still records the seq so its next ping
 // acknowledges it and the dispatcher's state store releases it (D-008).
+// Waiting reports whether a rider is still waiting for a car (not expired, not assigned).
+func (w *World) Waiting(tripID int64) bool {
+	wr, ok := w.waiting[tripID]
+	return ok && !wr.assigned
+}
+
 func (w *World) Assign(a model.Assignment) error {
 	v, ok := w.byID[a.VehicleID]
 	if !ok {

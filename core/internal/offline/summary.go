@@ -56,12 +56,19 @@ type Summary struct {
 	ByKind     map[string]int `json:"served_by_kind"`
 	ByHour     []HourStats    `json:"by_hour"`
 	Rounds     int            `json:"dispatch_rounds"`
+	// Offers to human drivers over the whole run (incl. warm-up) and the decline rate.
+	OffersMade  int     `json:"offers_made,omitempty"`
+	DeclineRate float64 `json:"decline_rate,omitempty"`
 	RuntimeSec float64        `json:"runtime_s"`
 }
 
 // Summarize computes stats over non-warm-up requests.
 func Summarize(res *Result) Summary {
-	s := Summary{ByKind: map[string]int{}, Rounds: res.Rounds, RuntimeSec: res.Elapsed.Seconds()}
+	s := Summary{ByKind: map[string]int{}, Rounds: res.Rounds, RuntimeSec: res.Elapsed.Seconds(),
+		OffersMade: res.OffersMade}
+	if res.OffersMade > 0 {
+		s.DeclineRate = float64(res.Declined) / float64(res.OffersMade)
+	}
 	var sim, real, pickup []float64
 	type hourAcc struct {
 		req, unserved int

@@ -36,9 +36,43 @@ type Config struct {
 	Supply   Supply
 	AVShare  float64
 	Seed     uint64
+	// Offers models human drivers answering ride offers. Zero value = off (every offer
+	// accepted instantly, the Phase 1 behaviour).
+	Offers Offers
 	// Observe, if set, is called after every clock step with a read-only view of the
 	// world (used by cmd/export-replay to record frames for the dashboard).
 	Observe func(t int64, v View)
+}
+
+// Offers: a human driver takes Delay to answer an offer and declines with probability
+// DeclineBase + DeclinePerMin * (pickup ETA in minutes), capped at DeclineMax. During
+// the Delay the car is held and the rider keeps waiting; after a decline both go back
+// to the pool. Robotaxis accept instantly. The public data has no offers or declines, so
+// these numbers are fitted (cmd/offline -decline-*, see D-017), not measured.
+type Offers struct {
+	Delay         time.Duration
+	DeclineBase   float64
+	DeclinePerMin float64
+	DeclineMax    float64
+}
+
+func (o Offers) on() bool { return o.Delay > 0 || o.DeclineBase > 0 || o.DeclinePerMin > 0 }
+
+func (o Offers) declineP(etaSec int64) float64 {
+	p := o.DeclineBase + o.DeclinePerMin*float64(etaSec)/60
+	hi := o.DeclineMax
+	if hi <= 0 {
+		hi = 0.95
+	}
+	return max(0, min(p, hi))
+}
+
+// offer waits for a driver's answer.
+type offer struct {
+	at     int64 // when the driver answers
+	a      model.Assignment
+	req    model.RideRequest
+	accept bool
 }
 
 // View is a read-only snapshot passed to Config.Observe. Callers must not modify it.
@@ -86,6 +120,8 @@ type Result struct {
 	Samples []Sample
 	Rounds  int
 	Elapsed time.Duration
+	// Offers made to human drivers and how many were declined (Offers model on).
+	OffersMade, Declined int
 }
 
 type runner struct {
@@ -100,6 +136,10 @@ type runner struct {
 	online     map[string]bool
 	logoffDebt int // vehicles that should log off as soon as they become idle
 	nextID     int
+
+	offerRng *rand.Rand // separate stream: turning offers on doesn't move fleet placement
+	offers   []offer    // FIFO: constant Delay keeps it sorted by answer time
+	res      *Result
 }
 
 // Run simulates [From-Warmup, To+Patience+Drain] and returns per-trip outcomes.
@@ -118,6 +158,7 @@ func Run(ctx context.Context, cfg Config, trips []replay.Trip) (*Result, error) 
 		cfg: cfg, trips: trips, pool: state.NewMem(),
 		rng:     rand.New(rand.NewPCG(cfg.Seed, cfg.Seed^0x9e3779b97f4a7c15)),
 		results: map[int64]*TripResult{}, online: map[string]bool{},
+		offerRng: rand.New(rand.NewPCG(cfg.Seed^0x5bd1e995, cfg.Seed+0x2545f491)),
 	}
 	r.w = world.New(world.Config{Travel: cfg.Travel, Patience: cfg.Patience}, simStart, nil)
 
@@ -127,6 +168,7 @@ func Run(ctx context.Context, cfg Config, trips []replay.Trip) (*Result, error) 
 	reqs := trips[lo:hi]
 
 	res := &Result{}
+	r.res = res
 	next := 0
 	lastRound := int64(-1 << 62)
 	step := cfg.Step.Milliseconds()
@@ -151,6 +193,9 @@ func Run(ctx context.Context, cfg Config, trips []replay.Trip) (*Result, error) 
 		}
 		for _, e := range r.w.Advance(t).Events {
 			r.onEvent(e)
+		}
+		if err := r.answerOffers(t); err != nil {
+			return nil, err
 		}
 		if t-lastRound >= cfg.Window.Milliseconds() {
 			lastRound = t
@@ -210,14 +255,23 @@ func (r *runner) dispatch(ctx context.Context, now int64) error {
 		return err
 	}
 	done := make(map[int64]bool, len(assigned))
-	for _, a := range assigned {
-		if err := r.w.Assign(a); err != nil {
-			// Offline the dispatcher sees the exact world state, so this is a logic bug.
-			return fmt.Errorf("world rejected assignment %+v: %w", a, err)
+	byID := map[int64]model.RideRequest{}
+	if r.cfg.Offers.on() {
+		for _, q := range live {
+			byID[q.TripID] = q
 		}
+	}
+	for _, a := range assigned {
 		done[a.TripID] = true
-		r.results[a.TripID].Kind = string(a.Kind)
-		r.results[a.TripID].PickupETAS = float64(a.ETASec)
+		if r.cfg.Offers.on() && a.Kind == model.KindHuman {
+			accept := r.offerRng.Float64() >= r.cfg.Offers.declineP(a.ETASec)
+			r.offers = append(r.offers, offer{at: now + r.cfg.Offers.Delay.Milliseconds(), a: a, req: byID[a.TripID], accept: accept})
+			r.res.OffersMade++
+			continue
+		}
+		if err := r.start(a); err != nil {
+			return err
+		}
 	}
 	left := live[:0]
 	for _, q := range live {
@@ -226,6 +280,48 @@ func (r *runner) dispatch(ctx context.Context, now int64) error {
 		}
 	}
 	r.pending = left
+	return nil
+}
+
+func (r *runner) start(a model.Assignment) error {
+	if err := r.w.Assign(a); err != nil {
+		// Offline the dispatcher sees the exact world state, so this is a logic bug.
+		return fmt.Errorf("world rejected assignment %+v: %w", a, err)
+	}
+	r.results[a.TripID].Kind = string(a.Kind)
+	r.results[a.TripID].PickupETAS = float64(a.ETASec)
+	return nil
+}
+
+// answerOffers resolves offers whose answer time has come. An accepting driver starts
+// driving now (the rider waited through the answer delay). A declining driver goes back
+// to the pool and the rider back to the queue, in request order, for the next round.
+func (r *runner) answerOffers(now int64) error {
+	n, requeued := 0, false
+	for ; n < len(r.offers) && r.offers[n].at <= now; n++ {
+		o := r.offers[n]
+		waiting := r.w.Waiting(o.a.TripID) // false if the rider gave up meanwhile
+		if o.accept && waiting {
+			o.a.TS = now
+			if err := r.start(o.a); err != nil {
+				return err
+			}
+			continue
+		}
+		if !o.accept {
+			r.res.Declined++
+		}
+		v, _ := r.w.Vehicle(o.a.VehicleID)
+		r.pool.AddIdle(v.ID, v.Kind, v.ToLat, v.ToLon)
+		if waiting {
+			r.pending = append(r.pending, o.req)
+			requeued = true
+		}
+	}
+	r.offers = r.offers[n:]
+	if requeued {
+		sort.SliceStable(r.pending, func(i, j int) bool { return r.pending[i].TS < r.pending[j].TS })
+	}
 	return nil
 }
 
