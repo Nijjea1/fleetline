@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 660" font-family="ui-sans-serif, -apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="13">
+  <!-- Fleetline architecture. Hand-written SVG: edit this file directly. -->
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5b6472"/>
+    </marker>
+    <style>
+      .box { stroke-width:1.2; }
+      .plain { fill:#ffffff; stroke:#c9d1dc; }
+      .world { fill:#fff7ec; stroke:#f0c27b; }
+      .sys { fill:#eef4ff; stroke:#9db8ea; }
+      .data { fill:#f2faf5; stroke:#9fd3b4; }
+      .ml { fill:#f6f0ff; stroke:#c3a9ec; }
+      .t { font-weight:600; fill:#1d2430; }
+      .s { fill:#5b6472; font-size:11.5px; }
+      .tag { fill:#8a93a3; font-size:10.5px; text-anchor:end; }
+      .lbl { fill:#5b6472; font-size:11px; }
+      .edge { stroke:#5b6472; stroke-width:1.4; fill:none; marker-end:url(#a); }
+      .both { marker-start:url(#a); }
+      .dash { stroke-dasharray:5 4; }
+      .zone { font-size:11px; font-weight:600; letter-spacing:.06em; fill:#8a93a3; }
+    </style>
+  </defs>
+  <rect width="1000" height="660" fill="#fbfcfd"/>
+
+  <text x="40" y="34" class="zone">THE CITY (SIMULATED)</text>
+  <text x="390" y="34" class="zone">STREAMING CORE (GO)</text>
+  <text x="760" y="34" class="zone">VIEWS · STATE · ML</text>
+
+  <!-- ===== column 1 ===== -->
+  <rect x="40" y="56" width="280" height="78" rx="10" class="box data"/>
+  <text x="56" y="80" class="t">NYC TLC trip records</text>
+  <text x="56" y="99" class="s">Uber/Lyft, Sep 2026: 635k trips/day</text>
+  <text x="56" y="116" class="s">real waits (request → on-scene) = truth</text>
+
+  <rect x="40" y="170" width="280" height="118" rx="10" class="box world"/>
+  <text x="56" y="194" class="t">worldsim</text>
+  <text x="56" y="213" class="s">replays a real day's requests at N× speed</text>
+  <text x="56" y="230" class="s">drives ~22k cars (10% robotaxis)</text>
+  <text x="56" y="247" class="s">pings every 4 s, event-time stamped</text>
+  <text x="56" y="264" class="s">follows assignments, reports pickups</text>
+  <path d="M180,134 L180,168" class="edge"/>
+
+  <rect x="40" y="330" width="280" height="170" rx="10" class="box world"/>
+  <text x="56" y="354" class="t">offline mode (same policy code)</text>
+  <text x="56" y="374" class="s">world + dispatch in one process,</text>
+  <text x="56" y="391" class="s">in-memory pool, 1 s steps</text>
+  <text x="56" y="408" class="s">deterministic: same seed → same checksum</text>
+  <text x="56" y="425" class="s">full day in ~2.5 min</text>
+  <text x="56" y="452" class="s">calibration · policy experiments ·</text>
+  <text x="56" y="469" class="s">replay export for the dashboard</text>
+
+  <!-- ===== column 2 ===== -->
+  <rect x="390" y="56" width="300" height="232" rx="10" class="box sys"/>
+  <text x="406" y="80" class="t">Redpanda (Kafka API)</text>
+  <text x="406" y="99" class="s">12 partitions per topic, keyed by H3 cell</text>
+  <g font-size="12" fill="#1d2430">
+    <rect x="406" y="114" width="268" height="30" rx="6" fill="#fff" stroke="#c9d1dc"/>
+    <text x="418" y="134">vehicle.pings</text><text x="664" y="134" class="tag">world → fleetd</text>
+    <rect x="406" y="152" width="268" height="30" rx="6" fill="#fff" stroke="#c9d1dc"/>
+    <text x="418" y="172">ride.requests</text><text x="664" y="172" class="tag">world → fleetd</text>
+    <rect x="406" y="190" width="268" height="30" rx="6" fill="#fff" stroke="#c9d1dc"/>
+    <text x="418" y="210">dispatch.assignments</text><text x="664" y="210" class="tag">fleetd → world</text>
+    <rect x="406" y="228" width="268" height="30" rx="6" fill="#fff" stroke="#c9d1dc"/>
+    <text x="418" y="248">trip.events</text><text x="664" y="248" class="tag">world → fleetd</text>
+  </g>
+  <path d="M322,229 L388,229" class="edge both"/>
+
+  <rect x="390" y="330" width="300" height="170" rx="10" class="box sys"/>
+  <text x="406" y="354" class="t">fleetd</text>
+  <text x="406" y="374" class="s">applies ping batches to Redis (Lua)</text>
+  <text x="406" y="391" class="s">dispatch round every 1 s of event time:</text>
+  <text x="406" y="408" class="s">greedy · pickup-ETA cap · robotaxi zone</text>
+  <text x="406" y="425" class="s">atomic claim: no double assignment</text>
+  <text x="406" y="452" class="s">:9100 /metrics · /stats · /live</text>
+  <text x="406" y="469" class="s">/debug/pprof</text>
+  <path d="M540,290 L540,328" class="edge both"/>
+
+  <!-- ===== column 3 ===== -->
+  <rect x="760" y="56" width="200" height="134" rx="10" class="box plain"/>
+  <text x="776" y="80" class="t">Dashboard</text>
+  <text x="776" y="99" class="s">Next.js + deck.gl</text>
+  <text x="776" y="122" class="s">live: polls fleetd /live</text>
+  <text x="776" y="141" class="s">replay: a recorded run</text>
+  <text x="776" y="158" class="s">as static files</text>
+  <text x="776" y="175" class="s">(the public demo)</text>
+  <path d="M692,345 C730,330 760,260 800,192" class="edge dash"/>
+  <text x="756" y="292" class="lbl">/live</text>
+
+  <rect x="760" y="330" width="200" height="140" rx="10" class="box sys"/>
+  <text x="776" y="354" class="t">Redis</text>
+  <text x="776" y="373" class="s">veh:{id} hash</text>
+  <text x="776" y="390" class="s">idle:{kind} GEO index</text>
+  <text x="776" y="413" class="s">guards: stale timestamp,</text>
+  <text x="776" y="430" class="s">ping-before-ack sequence</text>
+  <path d="M692,410 L758,410" class="edge both"/>
+  <text x="697" y="400" class="lbl">state</text>
+  <text x="697" y="428" class="lbl">GEO</text>
+
+  <rect x="760" y="500" width="200" height="100" rx="10" class="box ml"/>
+  <text x="776" y="524" class="t">ml/ · ETA model</text>
+  <text x="776" y="543" class="s">OSRM road-graph baseline</text>
+  <text x="776" y="560" class="s">LightGBM · residual MLP</text>
+  <text x="776" y="577" class="s">ONNX → ORT / TensorRT</text>
+  <path d="M758,550 C700,550 640,540 600,502" class="edge dash"/>
+  <text x="612" y="560" class="lbl">Phase 3</text>
+
+  <!-- offline → dashboard: replay files, routed around the outside -->
+  <path d="M180,502 L180,615 Q180,625 190,625 L965,625 Q978,625 978,612 L978,133 Q978,123 968,123 L962,123" class="edge dash"/>
+  <text x="400" y="644" class="lbl">replay files: frames.bin · pickups.bin · meta.json</text>
+</svg>
