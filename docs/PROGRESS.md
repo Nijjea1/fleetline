@@ -105,3 +105,14 @@ Reference for the same 07:00–07:20 window, real Uber/Lyft: **mean 381 s, p50 2
 - Built a real-time dispatch platform in Go on Kafka (Redpanda) and Redis that replays a full day of NYC Uber/Lyft demand (620k requests, 29k vehicles); profiled the ingest path and raised peak throughput **22% to 187k GPS pings/s** on one laptop while cutting p99 latency at 150k/s from **242 to 46 ms**.
 - Proved zero data loss under failure: Redis frozen 10 s or killed 5 s, the backlog buffers in Kafka (up to 511k pings) and drains with every ping applied; the fault test found and fixed a silent batch-drop bug.
 - Built a deterministic simulator calibrated against real trips (median wait **206 s vs real 212 s**; held-out day 217 vs 208 s) and a LightGBM ETA model cutting error **54% vs OSRM** (515.7 → 236.5 s MAE on 4.1M trips), plus a deck.gl dashboard rendering 29k live vehicles (5.8 MB replay, deployed on Vercel).
+
+## 2026-11-25 (later): Phase 2 starts
+- **Dashboard fixed + redesigned**: the black basemap was a real bug (MapLibre v6 worker 404 after bundling), not headless. Labels drawn above the cars; first-visit intro, clearer panel, playback bar, tooltips, phone layout. Deployed (prebuilt, see memory/notes: Vercel Hobby blocks co-authored commits).
+- **E2/E3 batched matching**: `internal/assign` (exact sparse SSP solver, brute-force tested, ~0.1 ms/round) + `dispatch.Batched` with age weight 3 (D-016). Held-out Sep 23: mean wait **−18.6%**, p50 −18.4%, p90 −15.7%, empty drive −19.5%; unserved 0.07 → 0.10%.
+
+### Resume bullet (E2)
+- Cut average rider wait **18.6%** (p90 −15.7%) vs greedy dispatch with an exact batched min-cost assignment solver, measured by replaying a held-out day of **603k real NYC trips**; found and fixed rider starvation with an age-weighted objective.
+
+### Next
+1. E4: solver speed vs problem size: Go SSP vs SciPy Hungarian vs OR-Tools on cost matrices exported from real rounds; CUDA kernel on the RTX 5060.
+2. Accept/decline model (closes the D-015 per-hour gap).

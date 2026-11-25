@@ -27,6 +27,18 @@ The last two rows are an interleaved A/B (inline, workers, inline, workers…, 3
 
 **Backpressure:** at 50k pings/s, freezing Redis for 10 s builds a 511k-ping backlog in Kafka that drains in ~8 s; stopping Redis for 5 s triggers retries. Both runs end with **applied = sent exactly (0 lost)**. The test found and fixed a bug where Redis errors silently dropped batches. → [`backpressure.png`](bench/e1/backpressure.png)
 
+### Batched matching vs greedy (E2/E3): a full held-out day
+Greedy gives each rider the nearest free car immediately; batched solves all waiting riders together as an exact min-cost assignment (own sparse solver, checked against brute force). Same simulator, day, supply and candidate search; only the matching step changes. Tuned on Sep 16, reported on **Sep 23 (603,327 real requests), 3 seeds**:
+
+| Policy | Mean wait | Median | p90 | Empty drive to pickup | Unserved |
+| --- | --- | --- | --- | --- | --- |
+| Greedy | 274 s | 215 s | 597 s | 243 s | 0.07% |
+| **Batched** | **223 s (−18.6%)** | **175 s (−18.4%)** | **503 s (−15.7%)** | **195 s (−19.5%)** | 0.10% |
+
+Seed spread ±2 s. Pure total-time minimization starved far-away, long-waiting riders (unserved ×2.7); an age weight fixed it at a small cost. The dispatch window (1–10 s) barely moves batched; greedy improves with longer windows, narrowing the gap to −16%. → [`bench/e2/`](bench/e2/RESULTS.md), learning note [09](docs/learning/09-batched-matching.md)
+
+![E2](bench/e2/e2.png)
+
 ### Simulator validity
 | Check | Result |
 | --- | --- |
