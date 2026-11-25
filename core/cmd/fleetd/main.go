@@ -62,20 +62,21 @@ func main() {
 		patience  = flag.Duration("patience", 10*time.Minute, "drop requests older than this")
 		window    = flag.Duration("window", time.Second, "event time between dispatch rounds")
 		reset     = flag.Bool("reset", true, "clear Redis state on start")
+		maxPickup = flag.Duration("max-pickup", 10*time.Minute, "refuse pickups longer than this (0 = no cap)")
 	)
 	flag.Parse()
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 	if err := run(ctx, log, strings.Split(*brokers, ","), *redisAddr, *modelPath, *httpAddr,
-		*radius, *k, *patience, *window, *reset); err != nil {
+		*radius, *k, *patience, *window, *reset, *maxPickup); err != nil {
 		log.Error("fleetd failed", "err", err)
 		os.Exit(1)
 	}
 }
 
 func run(ctx context.Context, log *slog.Logger, brokers []string, redisAddr, modelPath, httpAddr string,
-	radius float64, k int, patience, window time.Duration, reset bool) error {
+	radius float64, k int, patience, window time.Duration, reset bool, maxPickup time.Duration) error {
 
 	travel, err := geo.LoadTravelModel(modelPath)
 	if err != nil {
@@ -103,7 +104,7 @@ func run(ctx context.Context, log *slog.Logger, brokers []string, redisAddr, mod
 
 	s := &server{
 		log: log, store: store, prod: prod,
-		policy:   &dispatch.Greedy{Travel: travel, RadiusMi: radius, K: k},
+		policy:   &dispatch.Greedy{Travel: travel, RadiusMi: radius, K: k, MaxPickupSec: maxPickup.Seconds()},
 		patience: patience.Milliseconds(), window: window.Milliseconds(),
 		summary: metrics.NewSummary(), requests: map[int64]reqInfo{},
 	}

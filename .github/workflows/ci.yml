@@ -9,8 +9,8 @@ jobs:
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: core } }
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with: { go-version-file: core/go.mod, cache-dependency-path: core/go.sum }
       - name: gofmt
         run: test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
@@ -27,8 +27,8 @@ jobs:
         image: redis:7.4-alpine
         ports: ["6379:6379"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with: { go-version-file: core/go.mod, cache-dependency-path: core/go.sum }
       - name: start Redpanda
         run: |
@@ -45,8 +45,8 @@ jobs:
       matrix: { project: [sim, ml] }
     defaults: { run: { working-directory: "${{ matrix.project }}" } }
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
         with: { enable-cache: true, cache-dependency-glob: "${{ matrix.project }}/uv.lock" }
       - run: uv sync --locked
       - run: uv run ruff check .
