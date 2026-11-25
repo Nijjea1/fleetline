@@ -120,3 +120,4 @@ Reference for the same 07:00–07:20 window, real Uber/Lyft: **mean 381 s, p50 2
 
 ### Resume bullet (E4, CPU)
 - Wrote an exact sparse assignment solver in Go that exploits city geography (near-linear scaling): **168 ms for 100k riders, 28× faster than Google OR-Tools and 217× faster than SciPy**, all verified to the same optimum.
+- **Driver offers (D-017) + E2b**: offer model (answer delay, ETA-dependent declines; robotaxis instant). Fitted on Sep 16 (hourly error 0.191 → 0.138), but on held-out Sep 23 it didn't transfer (hours within 15%: 7 → 4), so it is not claimed as realism. As a stress test: batched still −16.9% mean wait vs greedy with 24–27% declines. Ran with 2–4 parallel jobs; the user noticed heat, so default to JOBS=2.

@@ -39,6 +39,8 @@ Seed spread ±2 s. Pure total-time minimization starved far-away, long-waiting r
 
 ![E2](bench/e2/e2.png)
 
+**Stress test (E2b):** with a fitted driver-decline model (10 s to answer; far pickups declined more; 24–27% of offers declined), batched still cuts mean wait **16.9%** on held-out Sep 23. The model did *not* make hourly waits match reality better on the held-out day, so it stays a stress test ([D-017](docs/DECISIONS.md), [`bench/offers`](bench/offers/RESULTS.md)).
+
 ### Solver speed (E4): exact assignment at city scale
 Instances from real NYC pickup/drop-off points (8 nearest cars per rider); every solver must reach the same optimal total.
 

@@ -15,7 +15,7 @@ Source of truth for resume bullets. Every number links back to a script and resu
 - Proved zero data loss under failure: with Redis frozen or killed, the backlog buffers in Kafka (up to 511k pings) and drains completely. The test also exposed a silent data-drop bug, which I fixed. (bench/e1, docs/learning/07)
 
 **Optimization / algorithms**
-- Cut average rider wait **18.6%** (median −18.4%, p90 −15.7%) vs greedy dispatch with a batched min-cost assignment solver, measured on a held-out day of **603k real trips** (3 seeds). Found and fixed rider starvation with an age-weighted objective. (bench/e2)
+- Cut average rider wait **18.6%** (median −18.4%, p90 −15.7%) vs greedy dispatch with a batched min-cost assignment solver, measured on a held-out day of **603k real trips** (3 seeds). Found and fixed rider starvation with an age-weighted objective. The gain holds (−16.9%) when a fitted model has drivers decline a quarter of offers. (bench/e2, bench/offers)
 - Wrote an exact sparse assignment solver in Go that exploits city geography (near-linear scaling): **168 ms for 100k riders, 28× faster than Google OR-Tools and 217× faster than SciPy**, all verified to the same optimum. (bench/e4)
 
 **ML**
@@ -36,9 +36,9 @@ Go, Kafka/Redpanda, Redis (Lua scripting), Docker Compose, Python, NumPy/SciPy, 
 | TensorRT inference | Script written (ml/tensorrt), never run | Run on RTX 5060, produce a latency result file |
 | AWS / Terraform deploy | Not started | Infra in repo, deployed once, cost noted |
 | Waymo motion model (E8) | Not started. Robotaxis exist only as a simulated vehicle type (geofenced, 10% of new cars), with no Waymo data | Train on Waymo Open Motion + result |
-| Driver accept/decline model | Next on the plan | Model + re-run of E2 |
 
 ## Wording guardrails
+- The offer (accept/decline) model is a *stress test*, fitted with no ground truth. Don't claim it made the simulator match reality per hour: on the held-out day it didn't (D-017).
 - Don't say "faster than Uber" or compare waits with real Uber waits. The simulator has no driver accept/decline, so absolute waits are optimistic. Policy-vs-policy comparisons (the 18.6%) are fair.
 - The PyTorch MLP **lost** to LightGBM. Say "benchmarked" or "compared", never "deployed a deep learning ETA model".
 - The "Apple GPU" result is the M5 MacBook's GPU, not CUDA.
