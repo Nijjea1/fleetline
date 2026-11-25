@@ -19,8 +19,8 @@ var (
 	IngestLatency = promauto.NewHistogram(prometheus.HistogramOpts{
 		Name: "fleetline_ingest_latency_seconds",
 		Help: "Wall time from broker append to the ping being applied in Redis.",
-		// 0.5 ms .. ~4 s, doubling.
-		Buckets: prometheus.ExponentialBuckets(0.0005, 2, 14),
+		// 0.5 ms .. ~33 s, doubling (wide enough to see a saturated consumer).
+		Buckets: prometheus.ExponentialBuckets(0.0005, 2, 17),
 	})
 
 	PingBatchSize = promauto.NewHistogram(prometheus.HistogramOpts{
