@@ -82,6 +82,9 @@ func main() {
 		frame      = flag.Duration("frame", 10*time.Second, "simulated time between frames")
 		maxPickup  = flag.Duration("max-pickup", 600*time.Second, "greedy pickup-ETA cap")
 		out        = flag.String("out", "../web/public/replay", "output directory")
+		// Same conditions the per-hour calibration was fitted in (full day from 01:00).
+		// A short warm-up starts the fleet mostly idle and makes waits look far too good.
+		simFrom = flag.String("sim-from", "01:00", "start simulating here (warm-up until -from)")
 	)
 	flag.Parse()
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
@@ -115,7 +118,8 @@ func main() {
 	cfg := offline.Config{
 		Travel: travel,
 		Policy: &dispatch.Greedy{Travel: travel, RadiusMi: 3, K: 8, MaxPickupSec: maxPickup.Seconds()},
-		From:   fromMs, To: toMs, Warmup: time.Hour, Drain: 30 * time.Minute,
+		From:   fromMs, To: toMs, Warmup: time.Duration(fromMs-day.Add(hhmm(log, *simFrom)).UnixMilli()) * time.Millisecond,
+		Drain:    30 * time.Minute,
 		Patience: 10 * time.Minute, Window: time.Second,
 		Supply:  offline.DataSupply{Busy: travel.BusyVehiclesByHour, PerHour: &util.U},
 		AVShare: 0.1, Seed: 7,
@@ -229,7 +233,7 @@ func main() {
 		FrameS: int(frame.Seconds()), Frames: len(frames), Vehicles: n, Kinds: string(kinds),
 		BBox: bbox, RobotaxiZone: geo.RobotaxiZone, Pickups: npick, Minutes: minutes,
 		Summary: sum,
-		Params: map[string]string{"policy": "greedy", "max_pickup": maxPickup.String(),
+		Params: map[string]string{"policy": "greedy", "max_pickup": maxPickup.String(), "sim_from": *simFrom,
 			"supply": filepath.Base(*supplyFile), "seed": "7"},
 	}
 	must(log, os.MkdirAll(*out, 0o755))
