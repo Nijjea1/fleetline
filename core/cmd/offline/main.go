@@ -64,7 +64,7 @@ func main() {
 	flag.StringVar(&p.Policy, "policy", "greedy", "dispatch policy: greedy or batched")
 	flag.Float64Var(&p.RadiusMi, "radius", 3, "candidate search radius, miles")
 	flag.IntVar(&p.K, "k", 8, "candidates per vehicle kind")
-	flag.Float64Var(&p.AgeWeight, "age-weight", 1, "batched: seconds of pickup ETA one second of waiting is worth")
+	flag.Float64Var(&p.AgeWeight, "age-weight", 3, "batched: seconds of pickup ETA one second of waiting is worth")
 	flag.BoolVar(&p.NoSkip, "no-skip", false, "disable the skip-unchanged dispatch optimization")
 	flag.StringVar(&p.MaxPickup, "max-pickup", "0s", "reject matches with a longer pickup ETA (0s = no cap)")
 	flag.StringVar(&p.Supply, "supply", "data", "data (follow real busy curve) or fixed")
