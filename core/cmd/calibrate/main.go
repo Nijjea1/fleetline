@@ -44,14 +44,16 @@ type Iteration struct {
 
 // Output is the calibration file.
 type Output struct {
-	Replay      string      `json:"replay"`
-	MaxPickup   string      `json:"max_pickup"`
-	Seed        uint64      `json:"seed"`
-	Damping     float64     `json:"damping"`
-	MaxStep     float64     `json:"max_step"`
-	Iterations  []Iteration `json:"iterations"`
-	Utilization [24]float64 `json:"utilization_by_hour"` // best iteration
-	BestIter    int         `json:"best_iteration"`
+	Replay      string         `json:"replay"`
+	MaxPickup   string         `json:"max_pickup"`
+	Seed        uint64         `json:"seed"`
+	Offers      offline.Offers `json:"offers"`
+	DeclineRate float64        `json:"decline_rate_best,omitempty"`
+	Damping     float64        `json:"damping"`
+	MaxStep     float64        `json:"max_step"`
+	Iterations  []Iteration    `json:"iterations"`
+	Utilization [24]float64    `json:"utilization_by_hour"` // best iteration
+	BestIter    int            `json:"best_iteration"`
 }
 
 func main() {
@@ -64,6 +66,9 @@ func main() {
 		damping    = flag.Float64("damping", 0.3, "exponent on the wait ratio per step (1 = full step)")
 		maxStep    = flag.Float64("max-step", 0.08, "max relative change of an hour's utilization per iteration")
 		seed       = flag.Uint64("seed", 7, "random seed")
+		offerDelay = flag.Duration("offer-delay", 0, "driver answer delay (offer model, D-017)")
+		declBase   = flag.Float64("decline-base", 0, "decline probability at a 0-minute pickup")
+		declPerMin = flag.Float64("decline-per-min", 0, "added decline probability per pickup minute")
 		out        = flag.String("out", "../bench/calibration/sep16.json", "output file")
 	)
 	flag.Parse()
@@ -81,7 +86,9 @@ func main() {
 	for h := range u {
 		u[h] = *start
 	}
-	res := Output{Replay: filepath.Base(*replayPath), MaxPickup: maxPickup.String(), Seed: *seed, Damping: *damping, MaxStep: *maxStep}
+	offers := offline.Offers{Delay: *offerDelay, DeclineBase: *declBase, DeclinePerMin: *declPerMin}
+	res := Output{Replay: filepath.Base(*replayPath), MaxPickup: maxPickup.String(), Seed: *seed,
+		Offers: offers, Damping: *damping, MaxStep: *maxStep}
 	best := math.Inf(1)
 	var bestU [24]float64
 	scale := 1.0 // shrinks when an iteration gets clearly worse (backtracking)
@@ -98,7 +105,7 @@ func main() {
 			From:   day.Add(time.Hour).UnixMilli(), To: day.Add(24 * time.Hour).UnixMilli(),
 			Warmup: time.Hour, Drain: 30 * time.Minute, Patience: 10 * time.Minute, Window: time.Second,
 			Supply:  offline.DataSupply{Busy: travel.BusyVehiclesByHour, PerHour: &uu},
-			AVShare: 0.1, Seed: *seed,
+			AVShare: 0.1, Seed: *seed, Offers: offers,
 		}
 		r, err := offline.Run(ctx, cfg, trips)
 		must(log, err)
@@ -141,6 +148,7 @@ func main() {
 		} else {
 			if itr.MeanAbsErr < best {
 				best, bestU, res.Utilization, res.BestIter = itr.MeanAbsErr, itr.Utilization, itr.Utilization, it
+				res.DeclineRate = sum.DeclineRate
 			}
 			u = next
 		}

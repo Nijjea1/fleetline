@@ -50,10 +50,10 @@ type Config struct {
 // to the pool. Robotaxis accept instantly. The public data has no offers or declines, so
 // these numbers are fitted (cmd/offline -decline-*, see D-017), not measured.
 type Offers struct {
-	Delay         time.Duration
-	DeclineBase   float64
-	DeclinePerMin float64
-	DeclineMax    float64
+	Delay         time.Duration `json:"delay_ns"`
+	DeclineBase   float64       `json:"decline_base"`
+	DeclinePerMin float64       `json:"decline_per_min"`
+	DeclineMax    float64       `json:"decline_max,omitempty"`
 }
 
 func (o Offers) on() bool { return o.Delay > 0 || o.DeclineBase > 0 || o.DeclinePerMin > 0 }

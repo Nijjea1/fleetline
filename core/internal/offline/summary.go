@@ -52,14 +52,14 @@ type Summary struct {
 	// so the comparison is apples to apples.
 	Real WaitStats `json:"real_wait"`
 	// Pickup is the empty drive to each served rider (dispatcher ETA).
-	Pickup     WaitStats      `json:"pickup_eta"`
-	ByKind     map[string]int `json:"served_by_kind"`
-	ByHour     []HourStats    `json:"by_hour"`
-	Rounds     int            `json:"dispatch_rounds"`
+	Pickup WaitStats      `json:"pickup_eta"`
+	ByKind map[string]int `json:"served_by_kind"`
+	ByHour []HourStats    `json:"by_hour"`
+	Rounds int            `json:"dispatch_rounds"`
 	// Offers to human drivers over the whole run (incl. warm-up) and the decline rate.
 	OffersMade  int     `json:"offers_made,omitempty"`
 	DeclineRate float64 `json:"decline_rate,omitempty"`
-	RuntimeSec float64        `json:"runtime_s"`
+	RuntimeSec  float64 `json:"runtime_s"`
 }
 
 // Summarize computes stats over non-warm-up requests.
