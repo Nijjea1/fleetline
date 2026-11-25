@@ -46,6 +46,15 @@ type server struct {
 	mu       sync.Mutex
 	pending  []model.RideRequest
 	requests map[int64]reqInfo // trip -> request info, to compute waits from trip events
+
+	// applyQ hands decoded ping batches to ingest workers so the consumer can decode the
+	// next batch while Redis applies this one (E1). nil = apply inline (one at a time).
+	applyQ chan pingBatch
+}
+
+type pingBatch struct {
+	pings  []state.Ping
+	oldest time.Time
 }
 
 type reqInfo struct {
@@ -55,6 +64,10 @@ type reqInfo struct {
 
 // perPingScript: use the original one-Lua-call-per-ping ingest (E1 before/after).
 var perPingScript = flag.Bool("per-ping-script", false, "ingest with one Redis script call per ping (pre-E1 path)")
+
+// ingestWorkers: concurrent Redis ping writers. Out-of-order application across
+// batches is safe: the per-vehicle timestamp guard (D-008) drops older pings.
+var ingestWorkers = flag.Int("ingest-workers", 4, "concurrent ping-apply workers (0 = apply inline, pre-E1 behavior)")
 
 func main() {
 	var (
@@ -122,6 +135,18 @@ func run(ctx context.Context, log *slog.Logger, brokers []string, redisAddr, mod
 	}
 	defer cons.Close()
 
+	if *ingestWorkers > 0 {
+		// Buffer = workers: when every worker is busy the consumer blocks, stops polling,
+		// and the backlog stays in Kafka (bounded memory; lag is visible, nothing lost).
+		s.applyQ = make(chan pingBatch, *ingestWorkers)
+		for i := 0; i < *ingestWorkers; i++ {
+			go func() {
+				for b := range s.applyQ {
+					s.apply(b)
+				}
+			}()
+		}
+	}
 	go s.serveHTTP(ctx, httpAddr)
 	go s.dispatchLoop(ctx)
 	log.Info("fleetd ready", "policy", s.policy.Name(), "window", window, "http", httpAddr)
@@ -174,6 +199,16 @@ func (s *server) handleBatch(msgs []bus.Message) {
 	if len(pings) == 0 {
 		return
 	}
+	if s.applyQ != nil {
+		s.applyQ <- pingBatch{pings, oldest}
+		return
+	}
+	s.apply(pingBatch{pings, oldest})
+}
+
+// apply writes one ping batch to Redis and records ingest metrics.
+func (s *server) apply(b pingBatch) {
+	pings, oldest := b.pings, b.oldest
 	res, err := s.store.ApplyPings(context.Background(), pings)
 	if err != nil {
 		s.log.Error("apply pings", "err", err)
