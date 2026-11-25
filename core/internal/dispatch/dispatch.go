@@ -108,15 +108,47 @@ func (g *Greedy) remember(r model.RideRequest, hour int) {
 // searchRadius shrinks the radius to what the pickup cap allows at this hour: a car
 // farther than cap x speed / detour (straight line) can never be under the cap.
 func (g *Greedy) searchRadius(at time.Time) float64 {
-	if g.MaxPickupSec <= 0 {
-		return g.RadiusMi
+	return searchRadius(g.Travel, g.RadiusMi, g.MaxPickupSec, at)
+}
+
+func searchRadius(travel geo.TravelModel, radiusMi, maxPickupSec float64, at time.Time) float64 {
+	if maxPickupSec <= 0 {
+		return radiusMi
 	}
-	reach := g.MaxPickupSec * g.Travel.SpeedMPS(at) / g.Travel.DetourFactor
-	return min(g.RadiusMi, reach)
+	return min(radiusMi, maxPickupSec*travel.SpeedMPS(at)/travel.DetourFactor)
 }
 
 // Name implements Policy.
 func (g *Greedy) Name() string { return "greedy" }
+
+// fetchCandidates gets up to k idle cars of each eligible kind near every request, in one
+// batch (one Redis round trip). truncated[i] is true if a list was full, i.e. more idle
+// cars may exist beyond the top k.
+func fetchCandidates(ctx context.Context, pending []model.RideRequest, pool Pool, radius float64, k int) ([][]state.Candidate, []bool, error) {
+	var qs []state.Query
+	owner := make([]int, 0, len(pending)*2) // query index -> request index
+	for i, r := range pending {
+		qs = append(qs, state.Query{Kind: model.KindHuman, Lat: r.PickLat, Lon: r.PickLon, RadiusMi: radius, K: k})
+		owner = append(owner, i)
+		if AVEligible(r) {
+			qs = append(qs, state.Query{Kind: model.KindAV, Lat: r.PickLat, Lon: r.PickLon, RadiusMi: radius, K: k})
+			owner = append(owner, i)
+		}
+	}
+	res, err := pool.NearestIdleMany(ctx, qs)
+	if err != nil {
+		return nil, nil, err
+	}
+	cands := make([][]state.Candidate, len(pending))
+	truncated := make([]bool, len(pending))
+	for qi, cs := range res {
+		cands[owner[qi]] = append(cands[owner[qi]], cs...)
+		if len(cs) >= k {
+			truncated[owner[qi]] = true
+		}
+	}
+	return cands, truncated, nil
+}
 
 type option struct {
 	c   state.Candidate
@@ -138,28 +170,9 @@ func (g *Greedy) Dispatch(ctx context.Context, now int64, pending []model.RideRe
 		pending = g.skipUnchanged(tracker, pending, radius, at.Hour())
 	}
 
-	// Phase 1: fetch candidates for every request in one batch (one Redis round trip).
-	var qs []state.Query
-	owner := make([]int, 0, len(pending)*2) // query index -> request index
-	for i, r := range pending {
-		qs = append(qs, state.Query{Kind: model.KindHuman, Lat: r.PickLat, Lon: r.PickLon, RadiusMi: radius, K: g.K})
-		owner = append(owner, i)
-		if AVEligible(r) {
-			qs = append(qs, state.Query{Kind: model.KindAV, Lat: r.PickLat, Lon: r.PickLon, RadiusMi: radius, K: g.K})
-			owner = append(owner, i)
-		}
-	}
-	res, err := pool.NearestIdleMany(ctx, qs)
+	cands, truncated, err := fetchCandidates(ctx, pending, pool, radius, g.K)
 	if err != nil {
 		return nil, err
-	}
-	cands := make([][]state.Candidate, len(pending))
-	truncated := make([]bool, len(pending))
-	for qi, cs := range res {
-		cands[owner[qi]] = append(cands[owner[qi]], cs...)
-		if len(cs) >= g.K {
-			truncated[owner[qi]] = true // more idle cars may exist beyond the top K
-		}
 	}
 
 	// Phase 2: still greedy, oldest request first. A candidate may have been claimed by an

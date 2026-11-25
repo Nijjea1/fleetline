@@ -60,7 +60,7 @@ func main() {
 	flag.StringVar(&p.Warmup, "warmup", "45m", "simulated before -from, excluded from stats")
 	flag.StringVar(&p.Patience, "patience", "10m", "riders give up after this")
 	flag.StringVar(&p.Window, "window", "1s", "event time between dispatch rounds")
-	flag.StringVar(&p.Policy, "policy", "greedy", "dispatch policy: greedy")
+	flag.StringVar(&p.Policy, "policy", "greedy", "dispatch policy: greedy or batched")
 	flag.Float64Var(&p.RadiusMi, "radius", 3, "candidate search radius, miles")
 	flag.IntVar(&p.K, "k", 8, "candidates per vehicle kind")
 	flag.BoolVar(&p.NoSkip, "no-skip", false, "disable the skip-unchanged dispatch optimization")
@@ -148,6 +148,8 @@ func run(ctx context.Context, log *slog.Logger, p Params, out string) error {
 	case "greedy":
 		policy = &dispatch.Greedy{Travel: travel, RadiusMi: p.RadiusMi, K: p.K,
 			MaxPickupSec: durs["max-pickup"].Seconds(), NoSkip: p.NoSkip}
+	case "batched":
+		policy = &dispatch.Batched{Travel: travel, RadiusMi: p.RadiusMi, K: p.K, MaxPickupSec: durs["max-pickup"].Seconds()}
 	default:
 		return fmt.Errorf("unknown -policy %q", p.Policy)
 	}
