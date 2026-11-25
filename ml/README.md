@@ -81,11 +81,12 @@ Dispatch scores many (car, rider) pairs per round, so latency **per batch** matt
 
 | Batch | PyTorch CPU | ONNX Runtime CPU | PyTorch MPS (M5 GPU) |
 | --- | --- | --- | --- |
-| 1 | 0.058 ms | **0.019 ms** | 0.324 ms |
-| 1,024 | 0.670 ms | **0.540 ms** | 0.865 ms |
-| 8,192 | 20.1 ms* | 24.4 ms* | **1.9 ms** |
+| 1 | 0.032 ms | **0.009 ms** | 0.207 ms |
+| 256 | 0.141 ms | **0.102 ms** | 0.309 ms |
+| 1,024 | 0.315 ms | 0.314 ms | 0.386 ms |
+| 8,192 | 2.371 ms | 2.582 ms | **1.220 ms** |
 
-p50 latency, 200 reps after warm-up. *Measured while another job was using the CPU; to be re-run idle before quoting. Every runtime serves the same ONNX file. Mac numbers: `results/e6_inference_mac.json`. TensorRT FP32/FP16 (and INT8 with calibration) run on the RTX 5060 via `tensorrt/bench.sh`.
+p50 latency, 200 reps after warm-up, idle M5 MacBook. CPU wins up to ~1k rows; the M5 GPU is ~2× faster at 8k. (An earlier run taken while training was using the CPU showed 20 ms at 8k: a reminder to benchmark on an idle machine.) Every runtime serves the same ONNX file. Mac numbers: `results/e6_inference_mac.json`. TensorRT FP32/FP16 (and INT8 with calibration) run on the RTX 5060 via `tensorrt/bench.sh`.
 
 ## Robotaxi motion model (stretch, E8)
 

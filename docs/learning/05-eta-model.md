@@ -54,12 +54,13 @@ ONNX is a portable graph format: PyTorch exports it, and ONNX Runtime and Tensor
 
 | Batch | ONNX Runtime CPU | PyTorch on M5 GPU (MPS) |
 | --- | --- | --- |
-| 1 | 0.019 ms | 0.324 ms |
-| 8,192 | ~24 ms* | 1.9 ms |
+| 1 | 0.009 ms | 0.207 ms |
+| 1,024 | 0.314 ms | 0.386 ms |
+| 8,192 | 2.582 ms | 1.220 ms |
 
-*CPU numbers at large batches were measured while a training job was running; to be re-measured on an idle machine.
+At batch 1 the CPU wins by ~23×: launching GPU work costs more than the math. The crossover is around 1k rows; at 8k the GPU is ~2× faster. The model is small (2.2M parameters), so the GPU never gets much to chew on.
 
-At batch 1 the CPU wins by 17×: launching GPU work costs more than the math. At large batches the GPU's parallelism wins. Dispatch scores all (car, rider) pairs in a round at once, so batching is what makes the GPU worth it. This is the same "the GPU only wins above N" story the CUDA matcher will tell in Phase 2.
+**Benchmarking lesson:** the first run happened while a training job was using the CPU, and showed CPU at ~24 ms for 8k rows, which looked like a 12× GPU win. Re-run on an idle machine: 2.6 ms, a 2× win. Always benchmark on a quiet machine and record what else was running. Dispatch scores all (car, rider) pairs in a round at once, so batching is what makes the GPU worth it. This is the same "the GPU only wins above N" story the CUDA matcher will tell in Phase 2.
 
 ## Interview questions this answers
 - "How do you split time-series data?" / "What is leakage? Give an example from your project."

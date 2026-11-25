@@ -69,7 +69,7 @@ Reference for the same 07:00–07:20 window, real Uber/Lyft: **mean 381 s, p50 2
 **ML (`ml/`)**
 - OSRM (NY + NJ, pinned snapshot) in Docker; 263×263 zone matrix; Sep 2026 hourly weather; dataset 13.8M / 1.9M / 4.1M rows split by date (D-012).
 - E5 test MAE: OSRM 515.7 s → × hour-of-week 314.4 s → **LightGBM 236.5 s** → residual MLP 266.1 s (wider/longer MLP 268.1 s, no better). LightGBM is the ETA model to beat.
-- E6 (Mac): ONNX export matches PyTorch (same test MAE). Batch 1: ONNX Runtime CPU 0.019 ms vs M5 GPU 0.324 ms; batch 8,192: GPU 1.9 ms. CPU large-batch numbers to be re-measured on an idle machine. TensorRT script ready for the RTX 5060 (not yet run).
+- E6 (Mac): ONNX export matches PyTorch (same test MAE). Idle machine: batch 1 ONNX Runtime CPU 0.009 ms vs M5 GPU 0.207 ms; batch 8,192 CPU 2.58 ms vs GPU 1.22 ms (crossover ~1k rows). A first run taken while training was using the CPU had overstated the GPU win 6× and was discarded. TensorRT script ready for the RTX 5060 (not yet run).
 - Learning notes 05 (ETA) and 06 (cap, skip, calibration).
 
 ### Next
