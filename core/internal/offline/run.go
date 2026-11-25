@@ -66,6 +66,9 @@ type TripResult struct {
 	WaitS     float64 `json:"wait_s"`      // simulated request -> pickup
 	RealWaitS int64   `json:"real_wait_s"` // what Uber/Lyft achieved for this request
 	Kind      string  `json:"kind,omitempty"`
+	// PickupETAS is the dispatcher's estimate of the empty drive to the rider: time a
+	// car spends unpaid. Batching should shrink it.
+	PickupETAS float64 `json:"pickup_eta_s,omitempty"`
 }
 
 // Sample is the fleet state at one moment, recorded every minute.
@@ -214,6 +217,7 @@ func (r *runner) dispatch(ctx context.Context, now int64) error {
 		}
 		done[a.TripID] = true
 		r.results[a.TripID].Kind = string(a.Kind)
+		r.results[a.TripID].PickupETAS = float64(a.ETASec)
 	}
 	left := live[:0]
 	for _, q := range live {

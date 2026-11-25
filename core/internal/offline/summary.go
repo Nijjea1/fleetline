@@ -50,7 +50,9 @@ type Summary struct {
 	Sim          WaitStats `json:"sim_wait"`
 	// Real is computed over the same requests (all of them, served or not in our sim),
 	// so the comparison is apples to apples.
-	Real       WaitStats      `json:"real_wait"`
+	Real WaitStats `json:"real_wait"`
+	// Pickup is the empty drive to each served rider (dispatcher ETA).
+	Pickup     WaitStats      `json:"pickup_eta"`
 	ByKind     map[string]int `json:"served_by_kind"`
 	ByHour     []HourStats    `json:"by_hour"`
 	Rounds     int            `json:"dispatch_rounds"`
@@ -60,7 +62,7 @@ type Summary struct {
 // Summarize computes stats over non-warm-up requests.
 func Summarize(res *Result) Summary {
 	s := Summary{ByKind: map[string]int{}, Rounds: res.Rounds, RuntimeSec: res.Elapsed.Seconds()}
-	var sim, real []float64
+	var sim, real, pickup []float64
 	type hourAcc struct {
 		req, unserved int
 		sim, real     []float64
@@ -84,6 +86,7 @@ func Summarize(res *Result) Summary {
 			s.Served++
 			s.ByKind[t.Kind]++
 			sim = append(sim, t.WaitS)
+			pickup = append(pickup, t.PickupETAS)
 			ha.sim = append(ha.sim, t.WaitS)
 		case Expired:
 			s.Expired++
@@ -96,7 +99,7 @@ func Summarize(res *Result) Summary {
 	if s.Requests > 0 {
 		s.UnservedRate = float64(s.Expired+s.Unfinished) / float64(s.Requests)
 	}
-	s.Sim, s.Real = waitStats(sim), waitStats(real)
+	s.Sim, s.Real, s.Pickup = waitStats(sim), waitStats(real), waitStats(pickup)
 
 	type sampAcc struct{ online, busy, n float64 }
 	samp := map[int]*sampAcc{}

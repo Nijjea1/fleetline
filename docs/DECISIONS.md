@@ -116,3 +116,11 @@ Short architecture decision records. Each entry: what we chose, what we rejected
 - **Rejected (for Phase 1):** adding a fitted driver accept/decline model to chase per-hour targets.
 - **Why:** With supply as the only knob, per-hour calibration plateaus at 10/18 hours (best mean error 0.191) because waits are flat until a cliff and hours are coupled. Most hours are *too fast*, consistent with real waits including accept/decline time the simulator doesn't model. That model has no ground truth in the public data, so it would be a fitted assumption; it's the first item for Phase 2. The day-level distribution already transfers to an unseen day (Sep 23: p50 217 vs 208 s, p90 597 vs 546 s).
 - **Consequence:** policy comparisons are valid *relative to each other* on the same simulator; absolute wait numbers are not claimed to match reality hour by hour.
+
+## D-016 · Batched matching: exact sparse solver in Go, with an age weight
+
+- **Date:** 2026-11-25
+- **Chose:** `dispatch.Batched` solves each round's riders × (top-K candidate cars) as one min-cost assignment with `internal/assign`: successive shortest paths with Dijkstra and potentials, on the sparse edge list. Objective: match as many riders as possible, then minimize Σ (pickup ETA + 1 s per second the rider has *not* waited relative to the oldest rider), i.e. `-age-weight 1`.
+- **Rejected:** calling SciPy / OR-Tools from the simulator (a process boundary every simulated second, and a dense 1,000 × 29,000 matrix where each rider has 8–16 real options); age weight 0.
+- **Why:** The solver is exact (matches brute force on 2,000 random instances) and fast enough to run every round (~0.1 ms for 300 riders × 8 cars). With age weight 0, riders competing for the last nearby car could lose round after round: unserved went from 0.03% (greedy) to 0.24% on 07:00–08:00. Weight 1 restored 0.03% and kept most of the p90 gain (512 → 440 s). The weight was picked on that one hour; E2 reports the full calibration day and the held-out Sep 23.
+- **Consequence:** SciPy, OR-Tools and the CUDA solver belong in E4 (solver speed on cost matrices exported from real rounds), not in the simulator loop. Same candidate search, radius and pickup cap as greedy, so E2 isolates the matching step.

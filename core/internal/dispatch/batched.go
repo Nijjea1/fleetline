@@ -23,6 +23,12 @@ type Batched struct {
 	RadiusMi     float64
 	K            int
 	MaxPickupSec float64
+	// AgeWeight trades pickup time for fairness: each second a rider has already waited
+	// counts as this many seconds of pickup ETA saved if they're matched now. With 0, the
+	// solver only minimizes total ETA, so when riders compete for the last nearby car a
+	// long-waiting rider can lose round after round and give up (E2 found unserved 8x
+	// greedy's). Greedy gets this for free by serving the oldest request first.
+	AgeWeight float64
 }
 
 // unmatchedCost must exceed any possible change in total ETA, so the solver never leaves
@@ -41,6 +47,14 @@ func (b *Batched) Dispatch(ctx context.Context, now int64, pending []model.RideR
 		return nil, err
 	}
 
+	// A row-constant term (older rider -> cheaper) only changes *which* riders get matched
+	// when not all can be, never which car a matched rider takes. Offset by the oldest age
+	// so costs stay non-negative, as the solver requires.
+	var oldest int64
+	for _, r := range pending {
+		oldest = max(oldest, now-r.TS)
+	}
+
 	// Columns = distinct candidate cars, in first-seen order (deterministic).
 	colOf := map[string]int{}
 	var cars []state.Candidate
@@ -57,7 +71,8 @@ func (b *Batched) Dispatch(ctx context.Context, now int64, pending []model.RideR
 				colOf[c.VehicleID] = j
 				cars = append(cars, c)
 			}
-			edges = append(edges, assign.Edge{Row: i, Col: j, Cost: eta})
+			bonus := b.AgeWeight * float64(oldest-(now-r.TS)) / 1000
+			edges = append(edges, assign.Edge{Row: i, Col: j, Cost: eta + bonus})
 		}
 	}
 	if len(edges) == 0 {

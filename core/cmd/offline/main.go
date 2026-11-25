@@ -41,6 +41,7 @@ type Params struct {
 	Policy      string  `json:"policy"`
 	RadiusMi    float64 `json:"radius_mi"`
 	K           int     `json:"k"`
+	AgeWeight   float64 `json:"age_weight"`
 	MaxPickup   string  `json:"max_pickup"`
 	NoSkip      bool    `json:"no_skip,omitempty"`
 	Supply      string  `json:"supply"`
@@ -63,6 +64,7 @@ func main() {
 	flag.StringVar(&p.Policy, "policy", "greedy", "dispatch policy: greedy or batched")
 	flag.Float64Var(&p.RadiusMi, "radius", 3, "candidate search radius, miles")
 	flag.IntVar(&p.K, "k", 8, "candidates per vehicle kind")
+	flag.Float64Var(&p.AgeWeight, "age-weight", 1, "batched: seconds of pickup ETA one second of waiting is worth")
 	flag.BoolVar(&p.NoSkip, "no-skip", false, "disable the skip-unchanged dispatch optimization")
 	flag.StringVar(&p.MaxPickup, "max-pickup", "0s", "reject matches with a longer pickup ETA (0s = no cap)")
 	flag.StringVar(&p.Supply, "supply", "data", "data (follow real busy curve) or fixed")
@@ -149,7 +151,7 @@ func run(ctx context.Context, log *slog.Logger, p Params, out string) error {
 		policy = &dispatch.Greedy{Travel: travel, RadiusMi: p.RadiusMi, K: p.K,
 			MaxPickupSec: durs["max-pickup"].Seconds(), NoSkip: p.NoSkip}
 	case "batched":
-		policy = &dispatch.Batched{Travel: travel, RadiusMi: p.RadiusMi, K: p.K, MaxPickupSec: durs["max-pickup"].Seconds()}
+		policy = &dispatch.Batched{Travel: travel, RadiusMi: p.RadiusMi, K: p.K, MaxPickupSec: durs["max-pickup"].Seconds(), AgeWeight: p.AgeWeight}
 	default:
 		return fmt.Errorf("unknown -policy %q", p.Policy)
 	}
@@ -188,12 +190,13 @@ func write(dir string, p Params, sum offline.Summary, res *offline.Result) error
 		return err
 	}
 
-	rows := [][]string{{"trip_id", "request_ts", "warmup", "outcome", "wait_s", "real_wait_s", "kind"}}
+	rows := [][]string{{"trip_id", "request_ts", "warmup", "outcome", "wait_s", "real_wait_s", "kind", "pickup_eta_s"}}
 	for _, t := range res.Trips {
 		rows = append(rows, []string{
 			strconv.FormatInt(t.TripID, 10), strconv.FormatInt(t.RequestTS, 10),
 			strconv.FormatBool(t.Warmup), string(t.Outcome),
 			strconv.FormatFloat(t.WaitS, 'f', 3, 64), strconv.FormatInt(t.RealWaitS, 10), t.Kind,
+			strconv.FormatFloat(t.PickupETAS, 'f', 0, 64),
 		})
 	}
 	if err := writeCSV(filepath.Join(dir, "trips.csv"), rows); err != nil {
