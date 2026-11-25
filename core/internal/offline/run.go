@@ -36,6 +36,16 @@ type Config struct {
 	Supply   Supply
 	AVShare  float64
 	Seed     uint64
+	// Observe, if set, is called after every clock step with a read-only view of the
+	// world (used by cmd/export-replay to record frames for the dashboard).
+	Observe func(t int64, v View)
+}
+
+// View is a read-only snapshot passed to Config.Observe. Callers must not modify it.
+type View struct {
+	Vehicles []*world.Vehicle
+	Online   map[string]bool
+	Pending  []model.RideRequest
 }
 
 // Outcome of one ride request.
@@ -145,6 +155,9 @@ func Run(ctx context.Context, cfg Config, trips []replay.Trip) (*Result, error) 
 				return nil, err
 			}
 			res.Rounds++
+		}
+		if cfg.Observe != nil {
+			cfg.Observe(t, View{Vehicles: r.w.Vehicles(), Online: r.online, Pending: r.pending})
 		}
 	}
 
