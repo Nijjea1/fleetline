@@ -44,3 +44,7 @@ infra/**/.terraform/
 bench/runs/**/trips.csv
 bench/runs/**/samples.csv
 bench/runs/smoke*/
+
+# run logs
+bench/**/*.log
+bench/runs/demo/
