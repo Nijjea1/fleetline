@@ -1,0 +1,24 @@
+{
+  "label": "profile_140k",
+  "started": "2026-11-25T03:03:51.683779Z",
+  "vehicles": 20000,
+  "step_s": 60,
+  "workers": 4,
+  "linger": "5ms",
+  "steps": [
+    {
+      "offered_rate": 140000,
+      "rep": 0,
+      "produced_per_s": 139976.62113110864,
+      "applied_per_s": 135060.4952505402,
+      "ingest_p50_ms": 1309.653560042508,
+      "ingest_p99_ms": 7269.292972972971,
+      "ingest_max_bucket_ms": 8192,
+      "lag_end": 294968,
+      "drain_s": 2.228246792,
+      "mean_batch": 4861.212957408518,
+      "stale_frac": 0.008665116252667627,
+      "sustained": false
+    }
+  ]
+}

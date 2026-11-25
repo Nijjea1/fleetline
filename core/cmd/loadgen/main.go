@@ -140,9 +140,10 @@ func main() {
 			}
 			_ = prod.Flush(ctx)
 			st.DrainSec = waitDrain(ctx, *metrics, base, g.sent.Load(), 180*time.Second)
-			// Sustained = fleetd kept up during the step (no backlog worth > 1 s of input)
-			// and the sender really offered the rate.
-			st.Sustained = st.Produced >= 0.97*float64(rate) && st.LagEnd >= 0 && st.LagEnd < int64(rate)
+			// Sustained = the sender really offered the rate, fleetd applied >= 99% of it,
+			// and the backlog at the end is under 0.1 s worth of input.
+			st.Sustained = st.Produced >= 0.97*float64(rate) && st.Applied >= 0.99*st.Produced &&
+				st.LagEnd >= 0 && st.LagEnd < int64(rate)/10
 			out.Steps = append(out.Steps, st)
 			log.Info("step", "rate", rate, "rep", rep, "produced", int(st.Produced), "applied", int(st.Applied),
 				"p50_ms", round(st.P50ms), "p99_ms", round(st.P99ms), "lag_end", st.LagEnd,

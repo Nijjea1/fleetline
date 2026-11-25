@@ -28,6 +28,12 @@ def load(label):
     return d, dict(sorted(by.items()))
 
 
+def sustained(s):
+    """Same rule as loadgen (recomputed so older result files use the strict version)."""
+    return (s["produced_per_s"] >= 0.97 * s["offered_rate"] and s["applied_per_s"] >= 0.99 * s["produced_per_s"]
+            and 0 <= s["lag_end"] < s["offered_rate"] / 10)
+
+
 def stat(steps, key):
     v = sorted(s[key] for s in steps)
     return v[len(v) // 2], v[0], v[-1]
@@ -41,7 +47,7 @@ def table(label, by):
         p50 = stat(steps, "ingest_p50_ms")[0]
         p99 = stat(steps, "ingest_p99_ms")[0]
         lag = stat(steps, "lag_end")[0]
-        ok = sum(s["sustained"] for s in steps)
+        ok = sum(sustained(s) for s in steps)
         print(f"{rate:>8,} {a:>12,.0f} ({lo:,.0f}-{hi:,.0f}) {p50:>8.1f} {p99:>8.1f} {lag:>9,} {ok}/{len(steps):>7}")
 
 
