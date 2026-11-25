@@ -3,6 +3,8 @@
 //   frames.bin : per frame  lat[N]u16 lon[N]u16 status[N]u8 nPending:u16 (lat,lon u16)[nPending]
 //   pickups.bin: per pickup t:u16 lat:u16 lon:u16 wait:u16 kind:u8   (9 bytes, packed)
 
+import { STATUS, type RGB } from "./theme";
+
 export type Minute = {
   t: number;
   online: number;
@@ -29,6 +31,7 @@ export type Meta = {
   pickups: number;
   minutes: Minute[];
   params: Record<string, string>;
+  summary: { requests: number; served: number; unserved_rate: number };
 };
 
 export type Frame = {
@@ -92,10 +95,10 @@ export async function loadReplay(base = "replay"): Promise<Replay> {
   return { meta, frames, pickups, isAV, bytes: fb.byteLength + pb.byteLength };
 }
 
-export const STATUS_COLORS: Record<number, [number, number, number]> = {
-  1: [110, 168, 254], // idle: blue
-  2: [255, 180, 84], // en route to pickup: amber
-  3: [61, 220, 151], // on trip: green
+export const STATUS_COLORS: Record<number, RGB> = {
+  1: STATUS.idle.rgb,
+  2: STATUS.pickup.rgb,
+  3: STATUS.trip.rgb,
 };
 
 /** Positions and colors for every vehicle at time t (s since window start). */
