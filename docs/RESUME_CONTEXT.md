@@ -26,7 +26,7 @@ Source of truth for resume bullets. Every number links back to a script and resu
 - Built a deck.gl + MapLibre dashboard (Next.js, deployed on Vercel) that animates 29k vehicles over a real NYC street map from a 5.8 MB replay file, plus a live mode fed by the running system. (web/)
 
 ## Skills that are honestly earned by this project
-Go, Kafka/Redpanda, Redis (Lua scripting), Docker Compose, Python, NumPy/SciPy, LightGBM, PyTorch, ONNX Runtime, OR-Tools, min-cost flow / assignment algorithms, load testing and profiling (pprof), Next.js/React/TypeScript, deck.gl, MapLibre, GitHub Actions CI, Vercel.
+Go, Kafka/Redpanda, Redis (Lua scripting), Docker Compose, Python, NumPy/SciPy, LightGBM, PyTorch, ONNX Runtime, OR-Tools, min-cost flow / assignment algorithms, load testing and profiling (Go pprof endpoints, Redis command stats), Next.js/React/TypeScript, deck.gl, MapLibre, GitHub Actions CI, Vercel.
 
 ## Planned, NOT built: do not claim yet
 | Item | Status | What unlocks the claim |
