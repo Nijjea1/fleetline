@@ -72,6 +72,7 @@ func main() {
 		linger   = flag.Duration("linger", 5*time.Millisecond, "producer linger")
 		label    = flag.String("label", "baseline", "result name: bench/e1/results/<label>.json")
 		outDir   = flag.String("out", "../bench/e1/results", "output directory")
+		cooldown = flag.Duration("cooldown", 0, "idle time after each step (lets a laptop's CPUs recover)")
 	)
 	flag.Parse()
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
@@ -145,6 +146,7 @@ func main() {
 			st.Sustained = st.Produced >= 0.97*float64(rate) && st.Applied >= 0.99*st.Produced &&
 				st.LagEnd >= 0 && st.LagEnd < int64(rate)/10
 			out.Steps = append(out.Steps, st)
+			time.Sleep(*cooldown)
 			log.Info("step", "rate", rate, "rep", rep, "produced", int(st.Produced), "applied", int(st.Applied),
 				"p50_ms", round(st.P50ms), "p99_ms", round(st.P99ms), "lag_end", st.LagEnd,
 				"drain_s", round(st.DrainSec), "batch", int(st.MeanBatch), "sustained", st.Sustained)

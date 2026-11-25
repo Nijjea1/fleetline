@@ -21,11 +21,15 @@ COLORS = ["#2a6fdb", "#e8743b", "#19a979", "#945ecf"]
 
 
 def load(label):
-    d = json.loads((HERE / "results" / f"{label}.json").read_text())
+    """All results/<label>.json and results/<label>_*.json (interleaved repetitions)."""
+    files = sorted({*(HERE / "results").glob(f"{label}.json"), *(HERE / "results").glob(f"{label}_*.json")})
+    if not files:
+        raise SystemExit(f"no results for {label}")
     by = defaultdict(list)
-    for s in d["steps"]:
-        by[s["offered_rate"]].append(s)
-    return d, dict(sorted(by.items()))
+    for f in files:
+        for s in json.loads(f.read_text())["steps"]:
+            by[s["offered_rate"]].append(s)
+    return files, dict(sorted(by.items()))
 
 
 def sustained(s):
@@ -46,6 +50,8 @@ def table(label, by):
         a, lo, hi = stat(steps, "applied_per_s")
         p50 = stat(steps, "ingest_p50_ms")[0]
         p99 = stat(steps, "ingest_p99_ms")[0]
+        if p99 < 0:  # beyond the histogram: only happens when saturated
+            p99 = float("inf")
         lag = stat(steps, "lag_end")[0]
         ok = sum(sustained(s) for s in steps)
         print(f"{rate:>8,} {a:>12,.0f} ({lo:,.0f}-{hi:,.0f}) {p50:>8.1f} {p99:>8.1f} {lag:>9,} {ok}/{len(steps):>7}")
