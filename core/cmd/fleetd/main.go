@@ -11,6 +11,7 @@ import (
 	"errors"
 	"flag"
 	"log/slog"
+	"math"
 	"net/http"
 	"net/http/pprof"
 	"os"
@@ -298,6 +299,39 @@ func (s *server) serveHTTP(ctx context.Context, addr string) {
 			Watermark string `json:"sim_time"`
 			metrics.Snapshot
 		}{s.policy.Name(), time.UnixMilli(s.watermark.Load()).UTC().Format(time.DateTime), s.summary.Snapshot()})
+	})
+	// /live feeds the dashboard's live mode: every vehicle as a flat array
+	// [lat, lon, status, kind, ...] (status 1 idle, 2 en route, 3 on trip; kind 0 human,
+	// 1 robotaxi), riders still waiting, and the running summary. Polled ~1/s.
+	mux.HandleFunc("/live", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Content-Type", "application/json")
+		vs, err := s.store.Snapshot(r.Context())
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusServiceUnavailable)
+			return
+		}
+		code := map[model.VehicleStatus]float64{model.StatusIdle: 1, model.StatusEnRoute: 2, model.StatusOnTrip: 3}
+		flat := make([]float64, 0, 4*len(vs))
+		for _, v := range vs {
+			kind := 0.0
+			if v.Kind == model.KindAV {
+				kind = 1
+			}
+			flat = append(flat, math.Round(v.Lat*1e5)/1e5, math.Round(v.Lon*1e5)/1e5, code[v.Status], kind)
+		}
+		s.mu.Lock()
+		pend := make([]float64, 0, 2*len(s.pending))
+		for _, p := range s.pending {
+			pend = append(pend, math.Round(p.PickLat*1e5)/1e5, math.Round(p.PickLon*1e5)/1e5)
+		}
+		s.mu.Unlock()
+		_ = json.NewEncoder(w).Encode(struct {
+			SimTime  string    `json:"sim_time"`
+			Vehicles []float64 `json:"vehicles"`
+			Pending  []float64 `json:"pending"`
+			metrics.Snapshot
+		}{time.UnixMilli(s.watermark.Load()).UTC().Format(time.DateTime), flat, pend, s.summary.Snapshot()})
 	})
 	srv := &http.Server{Addr: addr, Handler: mux, ReadHeaderTimeout: 5 * time.Second}
 	go func() { <-ctx.Done(); _ = srv.Close() }()

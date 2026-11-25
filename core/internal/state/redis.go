@@ -227,3 +227,42 @@ func (s *Store) Ping(ctx context.Context) error { return s.rdb.Ping(ctx).Err() }
 
 // Close closes the connection pool.
 func (s *Store) Close() error { return s.rdb.Close() }
+
+// Snapshot reads every vehicle's position, status and kind (for the live dashboard).
+// SCAN walks the keyspace in chunks without blocking Redis the way KEYS would; HMGETs
+// are pipelined so 20k vehicles cost a handful of round trips.
+func (s *Store) Snapshot(ctx context.Context) ([]Vehicle, error) {
+	var keys []string
+	iter := s.rdb.Scan(ctx, 0, "veh:*", 5000).Iterator()
+	for iter.Next(ctx) {
+		keys = append(keys, iter.Val())
+	}
+	if err := iter.Err(); err != nil {
+		return nil, err
+	}
+	out := make([]Vehicle, 0, len(keys))
+	for start := 0; start < len(keys); start += 5000 {
+		end := min(start+5000, len(keys))
+		pipe := s.rdb.Pipeline()
+		cmds := make([]*redis.SliceCmd, end-start)
+		for i, k := range keys[start:end] {
+			cmds[i] = pipe.HMGet(ctx, k, "lat", "lon", "status", "kind")
+		}
+		if _, err := pipe.Exec(ctx); err != nil && err != redis.Nil {
+			return nil, err
+		}
+		for i, c := range cmds {
+			v := c.Val()
+			if len(v) != 4 || v[0] == nil || v[1] == nil {
+				continue
+			}
+			lat, _ := strconv.ParseFloat(fmt.Sprint(v[0]), 64)
+			lon, _ := strconv.ParseFloat(fmt.Sprint(v[1]), 64)
+			out = append(out, Vehicle{
+				ID: keys[start+i][len("veh:"):], Lat: lat, Lon: lon,
+				Status: model.VehicleStatus(fmt.Sprint(v[2])), Kind: model.VehicleKind(fmt.Sprint(v[3])),
+			})
+		}
+	}
+	return out, nil
+}
