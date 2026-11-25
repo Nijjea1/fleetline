@@ -90,5 +90,30 @@ def main(labels):
     print(f"\n-> {out}")
 
 
-if __name__ == "__main__":
+if __name__ == "__main__" and "--backpressure" not in sys.argv:
     main(sys.argv[1:] or ["baseline"])
+
+
+def backpressure():
+    """C4 chart: lag while Redis hangs (pause) or is down (stop), then drains."""
+    fig, ax = plt.subplots(figsize=(7, 3.2))
+    for i, (mode, note) in enumerate((("pause", "Redis frozen 10 s"), ("stop", "Redis down 5 s"))):
+        f = HERE / "results" / f"backpressure_{mode}.json"
+        if not f.exists():
+            continue
+        tl = json.loads(f.read_text())["timeline"]
+        ax.plot([s["t_s"] for s in tl], [s["lag"] / 1000 for s in tl], color=COLORS[i], label=note)
+        end = tl[-1]
+        print(f"backpressure {mode}: peak lag {max(s['lag'] for s in tl):,}, final sent {end['sent']:,} "
+              f"applied {end['applied']:,} lost {end['sent'] - end['applied']:,}")
+    ax.set(xlabel="seconds into the step (50k pings/s offered)", ylabel="backlog (thousand pings)",
+           title="Backpressure: the backlog waits in Kafka, then drains; nothing lost")
+    ax.grid(alpha=0.3)
+    ax.legend(frameon=False, fontsize=8)
+    ax.spines[["top", "right"]].set_visible(False)
+    fig.tight_layout()
+    fig.savefig(HERE / "backpressure.png", dpi=150)
+
+
+if __name__ == "__main__" and "--backpressure" in sys.argv:
+    backpressure()
