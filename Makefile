@@ -32,6 +32,7 @@ test: ## Unit tests (Go + Python)
 	cd core && go test ./...
 	cd sim && uv run pytest -q
 	cd ml && uv run pytest -q
+	cd matcher && uv run pytest -q
 
 test-integration: up ## Integration tests against local Redpanda + Redis
 	cd core && go test -tags integration ./...

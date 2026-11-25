@@ -42,7 +42,7 @@ jobs:
   python:
     runs-on: ubuntu-latest
     strategy:
-      matrix: { project: [sim, ml] }
+      matrix: { project: [sim, ml, matcher] }
     defaults: { run: { working-directory: "${{ matrix.project }}" } }
     steps:
       - uses: actions/checkout@v7

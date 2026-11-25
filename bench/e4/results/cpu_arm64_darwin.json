@@ -1,0 +1,686 @@
+{
+ "meta": {
+  "machine": "cpu_arm64_darwin",
+  "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+  "processor": "arm",
+  "python": "3.14.10",
+  "when": "2026-11-25"
+ },
+ "rows": [
+  {
+   "n": 100,
+   "seed": 0,
+   "solver": "go_ssp",
+   "solve_s": 3.0042e-05,
+   "setup_s": 2.667e-06,
+   "edges": 470,
+   "matched": 89
+  },
+  {
+   "n": 100,
+   "seed": 0,
+   "solver": "scipy_dense",
+   "solve_s": 6.291699537541717e-05,
+   "setup_s": 2.4124994524754584e-05,
+   "edges": 470,
+   "matched": 89
+  },
+  {
+   "n": 100,
+   "seed": 0,
+   "solver": "scipy_sparse",
+   "solve_s": 4.187499871477485e-05,
+   "setup_s": 5.795799370389432e-05,
+   "edges": 470,
+   "matched": 89
+  },
+  {
+   "n": 100,
+   "seed": 0,
+   "solver": "ortools_flow",
+   "solve_s": 0.00022916699526831508,
+   "setup_s": 3.545799700077623e-05,
+   "edges": 470,
+   "matched": 89
+  },
+  {
+   "n": 100,
+   "seed": 1,
+   "solver": "go_ssp",
+   "solve_s": 4.7583e-05,
+   "setup_s": 2.583e-06,
+   "edges": 451,
+   "matched": 89
+  },
+  {
+   "n": 100,
+   "seed": 1,
+   "solver": "scipy_dense",
+   "solve_s": 8.433399489149451e-05,
+   "setup_s": 2.28749995585531e-05,
+   "edges": 451,
+   "matched": 89
+  },
+  {
+   "n": 100,
+   "seed": 1,
+   "solver": "scipy_sparse",
+   "solve_s": 4.587500006891787e-05,
+   "setup_s": 4.179199459031224e-05,
+   "edges": 451,
+   "matched": 89
+  },
+  {
+   "n": 100,
+   "seed": 1,
+   "solver": "ortools_flow",
+   "solve_s": 0.0002172499953303486,
+   "setup_s": 3.0167007935233414e-05,
+   "edges": 451,
+   "matched": 89
+  },
+  {
+   "n": 100,
+   "seed": 2,
+   "solver": "go_ssp",
+   "solve_s": 2.3625e-05,
+   "setup_s": 2.334e-06,
+   "edges": 417,
+   "matched": 88
+  },
+  {
+   "n": 100,
+   "seed": 2,
+   "solver": "scipy_dense",
+   "solve_s": 5.300001066643745e-05,
+   "setup_s": 2.1832995116710663e-05,
+   "edges": 417,
+   "matched": 88
+  },
+  {
+   "n": 100,
+   "seed": 2,
+   "solver": "scipy_sparse",
+   "solve_s": 3.4540993510745466e-05,
+   "setup_s": 4.1709005017764866e-05,
+   "edges": 417,
+   "matched": 88
+  },
+  {
+   "n": 100,
+   "seed": 2,
+   "solver": "ortools_flow",
+   "solve_s": 0.0001833749993238598,
+   "setup_s": 2.8875001589767635e-05,
+   "edges": 417,
+   "matched": 88
+  },
+  {
+   "n": 300,
+   "seed": 0,
+   "solver": "go_ssp",
+   "solve_s": 0.000101167,
+   "setup_s": 8.292e-06,
+   "edges": 2034,
+   "matched": 289
+  },
+  {
+   "n": 300,
+   "seed": 0,
+   "solver": "scipy_dense",
+   "solve_s": 0.00046633300371468067,
+   "setup_s": 0.0001252919901162386,
+   "edges": 2034,
+   "matched": 289
+  },
+  {
+   "n": 300,
+   "seed": 0,
+   "solver": "scipy_sparse",
+   "solve_s": 0.00014450000890064985,
+   "setup_s": 0.00012658399646170437,
+   "edges": 2034,
+   "matched": 289
+  },
+  {
+   "n": 300,
+   "seed": 0,
+   "solver": "ortools_flow",
+   "solve_s": 0.001469374998123385,
+   "setup_s": 0.00012450000212993473,
+   "edges": 2034,
+   "matched": 289
+  },
+  {
+   "n": 300,
+   "seed": 1,
+   "solver": "go_ssp",
+   "solve_s": 0.000107625,
+   "setup_s": 6.375e-06,
+   "edges": 2087,
+   "matched": 297
+  },
+  {
+   "n": 300,
+   "seed": 1,
+   "solver": "scipy_dense",
+   "solve_s": 0.00047066700062714517,
+   "setup_s": 0.00012141600018367171,
+   "edges": 2087,
+   "matched": 297
+  },
+  {
+   "n": 300,
+   "seed": 1,
+   "solver": "scipy_sparse",
+   "solve_s": 0.0001557079958729446,
+   "setup_s": 0.00012325000716373324,
+   "edges": 2087,
+   "matched": 297
+  },
+  {
+   "n": 300,
+   "seed": 1,
+   "solver": "ortools_flow",
+   "solve_s": 0.001603625001735054,
+   "setup_s": 0.00017295900033786893,
+   "edges": 2087,
+   "matched": 297
+  },
+  {
+   "n": 300,
+   "seed": 2,
+   "solver": "go_ssp",
+   "solve_s": 9.75e-05,
+   "setup_s": 7e-06,
+   "edges": 2109,
+   "matched": 293
+  },
+  {
+   "n": 300,
+   "seed": 2,
+   "solver": "scipy_dense",
+   "solve_s": 0.00044633299694396555,
+   "setup_s": 0.00012954199337400496,
+   "edges": 2109,
+   "matched": 293
+  },
+  {
+   "n": 300,
+   "seed": 2,
+   "solver": "scipy_sparse",
+   "solve_s": 0.00014470898895524442,
+   "setup_s": 0.00012116599828004837,
+   "edges": 2109,
+   "matched": 293
+  },
+  {
+   "n": 300,
+   "seed": 2,
+   "solver": "ortools_flow",
+   "solve_s": 0.0015035840042401105,
+   "setup_s": 0.00016683299327269197,
+   "edges": 2109,
+   "matched": 293
+  },
+  {
+   "n": 1000,
+   "seed": 0,
+   "solver": "go_ssp",
+   "solve_s": 0.000404458,
+   "setup_s": 2.2333e-05,
+   "edges": 7802,
+   "matched": 996
+  },
+  {
+   "n": 1000,
+   "seed": 0,
+   "solver": "scipy_dense",
+   "solve_s": 0.005399292000220157,
+   "setup_s": 0.0008047080045798793,
+   "edges": 7802,
+   "matched": 996
+  },
+  {
+   "n": 1000,
+   "seed": 0,
+   "solver": "scipy_sparse",
+   "solve_s": 0.0013235000078566372,
+   "setup_s": 0.0005867500003660098,
+   "edges": 7802,
+   "matched": 996
+  },
+  {
+   "n": 1000,
+   "seed": 0,
+   "solver": "ortools_flow",
+   "solve_s": 0.007492541000829078,
+   "setup_s": 0.0006618749903282151,
+   "edges": 7802,
+   "matched": 996
+  },
+  {
+   "n": 1000,
+   "seed": 1,
+   "solver": "go_ssp",
+   "solve_s": 0.000395667,
+   "setup_s": 2.7625e-05,
+   "edges": 7864,
+   "matched": 998
+  },
+  {
+   "n": 1000,
+   "seed": 1,
+   "solver": "scipy_dense",
+   "solve_s": 0.005476666003232822,
+   "setup_s": 0.0007734170067124069,
+   "edges": 7864,
+   "matched": 998
+  },
+  {
+   "n": 1000,
+   "seed": 1,
+   "solver": "scipy_sparse",
+   "solve_s": 0.0013700410054298118,
+   "setup_s": 0.0005894999922020361,
+   "edges": 7864,
+   "matched": 998
+  },
+  {
+   "n": 1000,
+   "seed": 1,
+   "solver": "ortools_flow",
+   "solve_s": 0.007190167001681402,
+   "setup_s": 0.0006766250007785857,
+   "edges": 7864,
+   "matched": 998
+  },
+  {
+   "n": 1000,
+   "seed": 2,
+   "solver": "go_ssp",
+   "solve_s": 0.000424666,
+   "setup_s": 2.6e-05,
+   "edges": 7787,
+   "matched": 996
+  },
+  {
+   "n": 1000,
+   "seed": 2,
+   "solver": "scipy_dense",
+   "solve_s": 0.005510624992894009,
+   "setup_s": 0.000804082999820821,
+   "edges": 7787,
+   "matched": 996
+  },
+  {
+   "n": 1000,
+   "seed": 2,
+   "solver": "scipy_sparse",
+   "solve_s": 0.001381540991133079,
+   "setup_s": 0.0005685840005753562,
+   "edges": 7787,
+   "matched": 996
+  },
+  {
+   "n": 1000,
+   "seed": 2,
+   "solver": "ortools_flow",
+   "solve_s": 0.007623750003403984,
+   "setup_s": 0.0006686249980702996,
+   "edges": 7787,
+   "matched": 996
+  },
+  {
+   "n": 3000,
+   "seed": 0,
+   "solver": "go_ssp",
+   "solve_s": 0.001687334,
+   "setup_s": 5.925e-05,
+   "edges": 23907,
+   "matched": 3000
+  },
+  {
+   "n": 3000,
+   "seed": 0,
+   "solver": "scipy_dense",
+   "solve_s": 0.06436420799582265,
+   "setup_s": 0.004873500001849607,
+   "edges": 23907,
+   "matched": 3000
+  },
+  {
+   "n": 3000,
+   "seed": 0,
+   "solver": "scipy_sparse",
+   "solve_s": 0.012477833006414585,
+   "setup_s": 0.00222583299910184,
+   "edges": 23907,
+   "matched": 3000
+  },
+  {
+   "n": 3000,
+   "seed": 0,
+   "solver": "ortools_flow",
+   "solve_s": 0.034865541994804516,
+   "setup_s": 0.0022919580078450963,
+   "edges": 23907,
+   "matched": 3000
+  },
+  {
+   "n": 3000,
+   "seed": 1,
+   "solver": "go_ssp",
+   "solve_s": 0.001676333,
+   "setup_s": 6.0375e-05,
+   "edges": 23915,
+   "matched": 2993
+  },
+  {
+   "n": 3000,
+   "seed": 1,
+   "solver": "scipy_dense",
+   "solve_s": 0.06563904100039508,
+   "setup_s": 0.004851459001656622,
+   "edges": 23915,
+   "matched": 2993
+  },
+  {
+   "n": 3000,
+   "seed": 1,
+   "solver": "scipy_sparse",
+   "solve_s": 0.012829833009163849,
+   "setup_s": 0.0021846669988008216,
+   "edges": 23915,
+   "matched": 2993
+  },
+  {
+   "n": 3000,
+   "seed": 1,
+   "solver": "ortools_flow",
+   "solve_s": 0.03207008299068548,
+   "setup_s": 0.002270791999762878,
+   "edges": 23915,
+   "matched": 2993
+  },
+  {
+   "n": 3000,
+   "seed": 2,
+   "solver": "go_ssp",
+   "solve_s": 0.001744917,
+   "setup_s": 7.5792e-05,
+   "edges": 23864,
+   "matched": 2991
+  },
+  {
+   "n": 3000,
+   "seed": 2,
+   "solver": "scipy_dense",
+   "solve_s": 0.06512800000200514,
+   "setup_s": 0.004834791994653642,
+   "edges": 23864,
+   "matched": 2991
+  },
+  {
+   "n": 3000,
+   "seed": 2,
+   "solver": "scipy_sparse",
+   "solve_s": 0.012752750000800006,
+   "setup_s": 0.0022542910010088235,
+   "edges": 23864,
+   "matched": 2991
+  },
+  {
+   "n": 3000,
+   "seed": 2,
+   "solver": "ortools_flow",
+   "solve_s": 0.028909583008498885,
+   "setup_s": 0.0023087500012479722,
+   "edges": 23864,
+   "matched": 2991
+  },
+  {
+   "n": 10000,
+   "seed": 0,
+   "solver": "go_ssp",
+   "solve_s": 0.007228209,
+   "setup_s": 0.000209959,
+   "edges": 79988,
+   "matched": 9982
+  },
+  {
+   "n": 10000,
+   "seed": 0,
+   "solver": "scipy_sparse",
+   "solve_s": 0.31784024999069516,
+   "setup_s": 0.008912667006370611,
+   "edges": 79988,
+   "matched": 9982
+  },
+  {
+   "n": 10000,
+   "seed": 0,
+   "solver": "ortools_flow",
+   "solve_s": 0.13347983300627675,
+   "setup_s": 0.008928541996283457,
+   "edges": 79988,
+   "matched": 9982
+  },
+  {
+   "n": 10000,
+   "seed": 1,
+   "solver": "go_ssp",
+   "solve_s": 0.008060833,
+   "setup_s": 0.000205375,
+   "edges": 79970,
+   "matched": 9942
+  },
+  {
+   "n": 10000,
+   "seed": 1,
+   "solver": "scipy_sparse",
+   "solve_s": 0.33997787498810794,
+   "setup_s": 0.008529000013368204,
+   "edges": 79970,
+   "matched": 9942
+  },
+  {
+   "n": 10000,
+   "seed": 1,
+   "solver": "ortools_flow",
+   "solve_s": 0.14752558300097007,
+   "setup_s": 0.00876129200332798,
+   "edges": 79970,
+   "matched": 9942
+  },
+  {
+   "n": 10000,
+   "seed": 2,
+   "solver": "go_ssp",
+   "solve_s": 0.007848292,
+   "setup_s": 0.000195208,
+   "edges": 79951,
+   "matched": 9969
+  },
+  {
+   "n": 10000,
+   "seed": 2,
+   "solver": "scipy_sparse",
+   "solve_s": 0.3371095000038622,
+   "setup_s": 0.008494333000271581,
+   "edges": 79951,
+   "matched": 9969
+  },
+  {
+   "n": 10000,
+   "seed": 2,
+   "solver": "ortools_flow",
+   "solve_s": 0.22561041699373163,
+   "setup_s": 0.008649125011288561,
+   "edges": 79951,
+   "matched": 9969
+  },
+  {
+   "n": 30000,
+   "seed": 0,
+   "solver": "go_ssp",
+   "solve_s": 0.024958167,
+   "setup_s": 0.000726875,
+   "edges": 239985,
+   "matched": 29765
+  },
+  {
+   "n": 30000,
+   "seed": 0,
+   "solver": "scipy_sparse",
+   "solve_s": 2.627294999998412,
+   "setup_s": 0.030553582997526973,
+   "edges": 239985,
+   "matched": 29765
+  },
+  {
+   "n": 30000,
+   "seed": 0,
+   "solver": "ortools_flow",
+   "solve_s": 0.6301900830003433,
+   "setup_s": 0.03013370800181292,
+   "edges": 239985,
+   "matched": 29765
+  },
+  {
+   "n": 30000,
+   "seed": 1,
+   "solver": "go_ssp",
+   "solve_s": 0.024870667,
+   "setup_s": 0.000854167,
+   "edges": 239989,
+   "matched": 29754
+  },
+  {
+   "n": 30000,
+   "seed": 1,
+   "solver": "scipy_sparse",
+   "solve_s": 2.655920207995223,
+   "setup_s": 0.030100000003585592,
+   "edges": 239989,
+   "matched": 29754
+  },
+  {
+   "n": 30000,
+   "seed": 1,
+   "solver": "ortools_flow",
+   "solve_s": 0.5885273750027409,
+   "setup_s": 0.0310625410056673,
+   "edges": 239989,
+   "matched": 29754
+  },
+  {
+   "n": 30000,
+   "seed": 2,
+   "solver": "go_ssp",
+   "solve_s": 0.029377125,
+   "setup_s": 0.000679417,
+   "edges": 239985,
+   "matched": 29770
+  },
+  {
+   "n": 30000,
+   "seed": 2,
+   "solver": "scipy_sparse",
+   "solve_s": 2.7355310000129975,
+   "setup_s": 0.03191212499223184,
+   "edges": 239985,
+   "matched": 29770
+  },
+  {
+   "n": 30000,
+   "seed": 2,
+   "solver": "ortools_flow",
+   "solve_s": 0.6719196249905508,
+   "setup_s": 0.029891958009102382,
+   "edges": 239985,
+   "matched": 29770
+  },
+  {
+   "n": 100000,
+   "seed": 0,
+   "solver": "go_ssp",
+   "solve_s": 0.15656,
+   "setup_s": 0.002673542,
+   "edges": 799988,
+   "matched": 92279
+  },
+  {
+   "n": 100000,
+   "seed": 0,
+   "solver": "scipy_sparse",
+   "solve_s": 34.42379579199769,
+   "setup_s": 0.11689345800550655,
+   "edges": 799988,
+   "matched": 92279
+  },
+  {
+   "n": 100000,
+   "seed": 0,
+   "solver": "ortools_flow",
+   "solve_s": 5.269986625004094,
+   "setup_s": 0.1260130409937119,
+   "edges": 799988,
+   "matched": 92279
+  },
+  {
+   "n": 100000,
+   "seed": 1,
+   "solver": "go_ssp",
+   "solve_s": 0.17946,
+   "setup_s": 0.00230425,
+   "edges": 799998,
+   "matched": 92315
+  },
+  {
+   "n": 100000,
+   "seed": 1,
+   "solver": "scipy_sparse",
+   "solve_s": 36.397953584004426,
+   "setup_s": 0.12240387499332428,
+   "edges": 799998,
+   "matched": 92315
+  },
+  {
+   "n": 100000,
+   "seed": 1,
+   "solver": "ortools_flow",
+   "solve_s": 4.759419916998013,
+   "setup_s": 0.12767658299708273,
+   "edges": 799998,
+   "matched": 92315
+  },
+  {
+   "n": 100000,
+   "seed": 2,
+   "solver": "go_ssp",
+   "solve_s": 0.167593583,
+   "setup_s": 0.002472917,
+   "edges": 799992,
+   "matched": 92365
+  },
+  {
+   "n": 100000,
+   "seed": 2,
+   "solver": "scipy_sparse",
+   "solve_s": 36.41933470900403,
+   "setup_s": 0.12168912500783335,
+   "edges": 799992,
+   "matched": 92365
+  },
+  {
+   "n": 100000,
+   "seed": 2,
+   "solver": "ortools_flow",
+   "solve_s": 4.544593124999665,
+   "setup_s": 0.12461820799217094,
+   "edges": 799992,
+   "matched": 92365
+  }
+ ]
+}

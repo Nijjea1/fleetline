@@ -39,6 +39,18 @@ Seed spread ±2 s. Pure total-time minimization starved far-away, long-waiting r
 
 ![E2](bench/e2/e2.png)
 
+### Solver speed (E4): exact assignment at city scale
+Instances from real NYC pickup/drop-off points (8 nearest cars per rider); every solver must reach the same optimal total.
+
+| Riders per batch | Fleetline Go solver | OR-Tools min-cost flow | SciPy sparse LAPJV |
+| --- | --- | --- | --- |
+| 1,000 | **0.40 ms** | 7.5 ms | 1.4 ms |
+| 100,000 | **168 ms** | 4.76 s (28×) | 36.4 s (217×) |
+
+Geography keeps augmenting paths short, so the Go solver scales ~n^1.1. CUDA comparison pending on the RTX 5060. → [`matcher/`](matcher/README.md)
+
+![E4](bench/e4/e4.png)
+
 ### Simulator validity
 | Check | Result |
 | --- | --- |
