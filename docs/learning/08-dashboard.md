@@ -27,8 +27,14 @@ The obvious deck.gl code passes an array of 29k JavaScript objects and accessor 
 ### A result too good to be true (again)
 The first export used a 1-hour warm-up. The dashboard showed Fleetline's median wait at 0:56 vs Uber/Lyft's 5:38: a 6× "win". It was an artifact: the fleet started mostly idle and hadn't reached steady state by 08:00. Warming up from 01:00, like the calibration, gives 3:06 vs 4:40: still faster than reality, by the known gap (no accept/decline time; D-015), which the dashboard states next to the chart. **A demo is a claim. Check it like a benchmark.**
 
-### Verifying a WebGL page without a human
-Headless Chrome with a software GPU (`--use-angle=swiftshader`) can screenshot a deck.gl page. Base-map tiles don't render in that mode, but the data layers do, which is what we needed to check. `?mode=live` exists partly so live mode can be screenshotted without clicking.
+### "It's just headless Chrome": a wrong diagnosis
+The basemap was black in every automated screenshot, and I wrote it off as a headless-browser limitation. The user's real browser showed the same black map. Root cause: MapLibre v6 loads its tile-parsing **worker** from a URL computed relative to its own script (`import.meta.url`). Next.js bundles that script into a chunk folder where the worker file doesn't exist, so the worker 404'd and no tile was ever drawn. Fix: copy `maplibre-gl-worker.mjs` into `public/` on every dev/build and call `setWorkerUrl()`. Lessons: **check the console before blaming the environment**, and a scripted real browser (puppeteer, `pageerror` + `requestfailed` listeners) beats screenshots for this.
+
+### Labels above 29k dots
+Labels drawn under the dots are unreadable in Manhattan. The textbook fix, deck.gl's "interleaved" mode, crashed every frame (`_nearZ` undefined): deck 9.4 reads MapLibre v5 internals. CARTO's raster label tiles now need an API key. What shipped: basemap without labels → deck.gl data → a second, non-interactive MapLibre map that draws only the label layers of the same style, following the deck.gl camera.
+
+### Design: make the page explain itself
+The first version showed numbers without context ("what am I looking at?"). The redesign: a first-visit intro, a one-line tagline and date context, one headline metric with an honest caveat, a fleet status bar that doubles as the legend, a media-style timeline, and hover tooltips. Status colors are reserved for cars (the chart is white/grey), and the panels are solid: a backdrop blur re-blurs three animating WebGL canvases every frame.
 
 ## Interview questions this answers
 - "How would you render tens of thousands of moving points in a browser?"
