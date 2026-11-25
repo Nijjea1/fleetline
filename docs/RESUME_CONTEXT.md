@@ -35,7 +35,7 @@ Go, Kafka/Redpanda, Redis (Lua scripting), Docker Compose, Python, NumPy/SciPy, 
 | NVIDIA cuOpt | Not started | Benchmark vs Go solver in bench/e4 |
 | TensorRT inference | Script written (ml/tensorrt), never run | Run on RTX 5060, produce a latency result file |
 | AWS / Terraform deploy | Not started | Infra in repo, deployed once, cost noted |
-| Robotaxi (Waymo-style) layer | Only a colour/legend in the dashboard; no simulation logic | Mixed-fleet simulation + experiment |
+| Waymo motion model (E8) | Not started. Robotaxis exist only as a simulated vehicle type (geofenced, 10% of new cars), with no Waymo data | Train on Waymo Open Motion + result |
 | Driver accept/decline model | Next on the plan | Model + re-run of E2 |
 
 ## Wording guardrails
