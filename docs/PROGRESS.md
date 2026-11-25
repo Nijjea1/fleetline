@@ -116,3 +116,7 @@ Reference for the same 07:00–07:20 window, real Uber/Lyft: **mean 381 s, p50 2
 ### Next
 1. E4: solver speed vs problem size: Go SSP vs SciPy Hungarian vs OR-Tools on cost matrices exported from real rounds; CUDA kernel on the RTX 5060.
 2. Accept/decline model (closes the D-015 per-hour gap).
+- **E4 (CPU)**: `matcher/` project + `core/cmd/assignbench`. Real-geography instances, all solvers verified to the same optimum. At 100k riders: Go SSP 168 ms, OR-Tools 4.76 s, SciPy sparse 36.4 s. In CI. Next: CUDA solver on the RTX 5060 (target: beat 25 ms at 30k).
+
+### Resume bullet (E4, CPU)
+- Wrote an exact sparse assignment solver in Go that exploits city geography (near-linear scaling): **168 ms for 100k riders, 28× faster than Google OR-Tools and 217× faster than SciPy**, all verified to the same optimum.

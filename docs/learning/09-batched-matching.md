@@ -36,3 +36,15 @@ Absolute waits aren't claimed to match reality hour by hour (D-015: no accept/de
 - "Your optimizer starved some users. How did you notice and fix it?"
 - "How do you avoid overfitting a parameter to your benchmark?"
 - "Does a longer batching window always help?"
+
+## E4: how fast are the solvers? (`matcher/`, `bench/e4/`)
+Same problem shape, scaled from 100 to 100,000 riders per batch, on instances built from real pickup/drop-off points. **Every solver must reach the same optimal total before its time counts.** A fast wrong answer is worthless, and this check would catch a buggy solver.
+
+| Riders | Fleetline Go SSP | SciPy sparse (LAPJV) | OR-Tools min-cost flow |
+| --- | --- | --- | --- |
+| 1,000 | 0.40 ms | 1.4 ms | 7.5 ms |
+| 100,000 | 168 ms | 36.4 s | 4.76 s |
+
+**Why a simple algorithm wins:** geography. A new rider's cheapest augmenting path only re-routes nearby riders onto nearby cars, so Dijkstra stops after a handful of nodes: near-linear total work (~n^1.1). General solvers are built for arbitrary graphs and can't assume that. **Know your problem's structure before reaching for the big library.**
+
+**What it means for the GPU (E4's real question):** a real round is ~1,000 riders, solved in 0.4 ms on CPU, nowhere near a bottleneck. A GPU only has a case at city-wide or multi-city batch sizes, and it must beat 25 ms at 30k and 168 ms at 100k: a much harder target than "faster than SciPy".
