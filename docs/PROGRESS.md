@@ -76,3 +76,24 @@ Reference for the same 07:00–07:20 window, real Uber/Lyft: **mean 381 s, p50 2
 1. Finish calibration; validate on the held-out day Sep 23 (checklist A5/A6).
 2. E1 load test on the live path.
 3. Dashboard replay exporter.
+
+## 2026-11-24
+**Shipping**
+- CI (GitHub Actions): gofmt/vet/race tests, Redpanda+Redis integration tests, Python lint+tests, dashboard build. Green on the first run.
+- `make demo`: infra + fleetd + worldsim + summary in one command, verified from a cold start.
+- Dashboard (Next.js 16 + deck.gl 9 + MapLibre): replay + live, deployed at **https://fleetline-sigma.vercel.app**. `cmd/export-replay` (5.8 MB brotli), fleetd `/live`. Caught a demo artifact: a 1 h warm-up showed a fake 6× win (D-015, note 08).
+- Architecture diagram (`docs/architecture.svg`), README rewritten around measured results.
+- Secrets scan (gitleaks): clean.
+
+**E1 load test**
+- `cmd/loadgen` (open loop, scrapes fleetd metrics). Baseline: **130k pings/s sustained (3/3)**, 140k not.
+- Profiles → chunked Lua (latency at 130k halved, ceiling ≈ same) → concurrent apply workers (first full repetition on AC power: **175k sustained, p99 54 ms**).
+- Backpressure: Redis frozen 10 s / down 5 s → lag peaks 511k / 244k, drains, **0 pings lost**. Found and fixed a data-loss bug (Redis errors dropped batches).
+- Measurement traps found: rejected sends counted as sent, inherited consumer-group backlog, machine drift, and the laptop switching to battery + Low Power Mode at 23:03 (later runs discarded).
+
+**Calibration (D-015):** Phase 1 target is day-level. Sep 16 calibrated: p50 206 vs 212 s, p90 586 vs 550 s. Held-out Sep 23: 217 vs 208, 597 vs 546.
+
+### Next
+1. On AC power: interleaved A/B (inline vs 4 workers) → final E1 numbers, README + resume bullet.
+2. RTX 5060: `matcher/gpu_smoke/run.sh` (F1/F2), then TensorRT (E6).
+3. Phase 2: accept/decline model, batched matching, CUDA matcher.
