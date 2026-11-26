@@ -1,0 +1,7 @@
+name, driver_version, memory.total [MiB]
+NVIDIA GeForce RTX 5060 Laptop GPU, 591.84, 8151 MiB
+Build cuda_12.9.r12.9/compiler.36037853_0
+GPU: NVIDIA GeForce RTX 5060 Laptop GPU, compute 12.0, 26 SMs, 8.5 GB
+vector add of 16777216 floats: 0.634 ms, 318 GB/s, correct
+torch 2.11.0+cu128 cuda 12.8 | NVIDIA GeForce RTX 5060 Laptop GPU
+fp16 8192^3 matmul: 89.5 ms = 12.3 TFLOPS

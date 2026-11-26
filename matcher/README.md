@@ -24,4 +24,13 @@ Why the gap: in a city, re-routing a rider only shuffles *nearby* cars, so each 
 
 ## GPU smoke test (Phase 1, checklist F)
 
-On the RTX 5060 machine: `matcher/gpu_smoke/run.sh`. It prints the GPU, builds and checks a CUDA vector-add (correctness + memory bandwidth), and runs an fp16 matmul in PyTorch. **Not yet run**; paste the output here when it is.
+On the RTX 5060 machine: `matcher/gpu_smoke/run.sh`. It prints the GPU, builds and checks a CUDA vector-add (correctness + memory bandwidth), and runs an fp16 matmul in PyTorch. Run on 2026-11-26 (Ubuntu 24.04 on WSL2, driver 591.84, CUDA 12.9); full output in `bench/gpu_smoke.txt`:
+
+```
+GPU: NVIDIA GeForce RTX 5060 Laptop GPU, compute 12.0, 26 SMs, 8.5 GB
+vector add of 16777216 floats: 0.634 ms, 318 GB/s, correct
+torch 2.11.0+cu128 cuda 12.8 | NVIDIA GeForce RTX 5060 Laptop GPU
+fp16 8192^3 matmul: 89.5 ms = 12.3 TFLOPS
+```
+
+A smoke test, not a benchmark: one run of 10 matmuls including cuBLAS warm-up.

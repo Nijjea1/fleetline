@@ -61,8 +61,8 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · 🖥️ needs the RTX
 
 | # | Item | Done when | Status |
 | --- | --- | --- | --- |
-| F1 | CUDA test kernel on the RTX 5060 | `nvcc` builds and runs a vector-add; output checked in `matcher/README.md` | ⬜ 🖥️ `matcher/gpu_smoke/run.sh` ready |
-| F2 | PyTorch sees the GPU | `torch.cuda.is_available()` and a matmul on the 5060 | ⬜ 🖥️ same script |
+| F1 | CUDA test kernel on the RTX 5060 | `nvcc` builds and runs a vector-add; output checked in `matcher/README.md` | ✅ 2026-11-26: vector-add correct, 318 GB/s (`bench/gpu_smoke.txt`) |
+| F2 | PyTorch sees the GPU | `torch.cuda.is_available()` and a matmul on the 5060 | ✅ torch 2.11.0+cu128 sees the 5060; fp16 matmul runs |
 
 ## Not Phase 1 (tracked so they don't creep in)
 Batching/Hungarian/CUDA matcher (Phase 2), OSRM + ETA model + TensorRT (Phase 3, started early in `ml/` at the user's request), AWS, Waymo.
