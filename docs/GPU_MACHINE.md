@@ -33,7 +33,7 @@ From the Mac, copy these into the same paths on the GPU machine (USB, AirDrop to
 ```bash
 bash matcher/gpu_smoke/run.sh 2>&1 | tee gpu_smoke.txt
 ```
-Passes if it prints the GPU name, `vecadd OK` and a PyTorch fp16 matmul TFLOPS line. Send `gpu_smoke.txt` back (paste it into Claude Code).
+Passes if it prints the GPU name, a `vector add … correct` line and a PyTorch fp16 matmul TFLOPS line. Send `gpu_smoke.txt` back (paste it into Claude Code).
 
 ## 4. TensorRT, E6 (3.3): 15 minutes
 Install TensorRT 10.x for your CUDA version (NVIDIA's apt repo: `sudo apt install tensorrt`, which includes `trtexec`; it may live in `/usr/src/tensorrt/bin`, so add that to PATH). Then:
