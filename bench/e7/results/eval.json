@@ -1,0 +1,32 @@
+{
+ "env": {
+  "machine": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+  "python": "3.14.10",
+  "time_limit_s": 1.0,
+  "workers": 2,
+  "when": "2026-11-26"
+ },
+ "tuned_on": "train sample, see tune.json",
+ "summary": {
+  "shortest": {
+   "routes": 3052,
+   "score_mean": 0.08765751031682219,
+   "score_median": 0.07485842066223272,
+   "tour_vs_driver": 0.9044655231344492,
+   "solve_s_mean": 0.9975726785475194,
+   "by_quality": {
+    "": 0.08765751031682219
+   }
+  },
+  "zones_flat_3000": {
+   "routes": 3052,
+   "score_mean": 0.05467354197388676,
+   "score_median": 0.04887992962464703,
+   "tour_vs_driver": 0.939795758352246,
+   "solve_s_mean": 1.0020694750916415,
+   "by_quality": {
+    "": 0.05467354197388676
+   }
+  }
+ }
+}
