@@ -52,6 +52,11 @@ def gpu_env() -> dict:
         return subprocess.run(cmd, check=False, capture_output=True, text=True).stdout.strip()
 
     env = {}
+    cpuinfo = Path("/proc/cpuinfo")
+    if cpuinfo.exists():
+        env["cpu"] = next(
+            (ln.split(":", 1)[1].strip() for ln in cpuinfo.read_text().splitlines() if ln.startswith("model name")), ""
+        )
     try:
         env["gpu"] = out(
             "nvidia-smi", "--query-gpu=name,driver_version,memory.total,compute_cap", "--format=csv,noheader"
