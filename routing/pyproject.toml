@@ -1,0 +1,27 @@
+[project]
+name = "fleetline-routing"
+version = "0.1.0"
+description = "Fleetline E7: delivery stop sequencing on 9,184 real Amazon Last Mile routes, scored against the drivers' actual order"
+readme = "README.md"
+requires-python = ">=3.12,<3.15"
+dependencies = [
+    "ijson>=3.6.0",
+    "numpy>=2.5.5",
+    "ortools>=9.15.6755",
+]
+
+[project.scripts]
+fleetline-routing = "fleetline_routing.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.13.9,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+    "ruff>=0.17.6",
+]
+
+[tool.ruff]
+line-length = 120
