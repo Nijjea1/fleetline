@@ -26,6 +26,8 @@ TUNE_GRID = {
     "zones_flat_300": (300, 300, 300),
     "zones_flat_1000": (1000, 1000, 1000),
     "zones_flat_3000": (3000, 3000, 3000),
+    "zones_flat_10000": (10000, 10000, 10000),
+    "zones_flat_30000": (30000, 30000, 30000),
     "zones_graded_60_600_3000": (60, 600, 3000),
     "zones_graded_300_1000_3000": (300, 1000, 3000),
     "zones_graded_100_1000_10000": (100, 1000, 10000),
@@ -104,6 +106,7 @@ def main():
     t = sub.add_parser("tune")
     t.add_argument("--sample", type=int, default=200)
     t.add_argument("--seed", type=int, default=0)
+    t.add_argument("--only", default="", help="comma-separated configs to (re)run; merged into tune.json")
     e = sub.add_parser("eval")
     for x in (t, e):
         x.add_argument("--time-limit", type=float, default=1.0)
@@ -118,14 +121,19 @@ def main():
     if a.cmd == "tune":
         ids = sorted(data.load("train"))
         ids = random.Random(a.seed).sample(ids, a.sample)
-        rows = _sweep("train", ids, TUNE_GRID, a.time_limit, a.workers)
+        grid = {k: TUNE_GRID[k] for k in a.only.split(",")} if a.only else TUNE_GRID
+        rows = _sweep("train", ids, grid, a.time_limit, a.workers)
         summary = _summarize(rows)
+        if a.only and (OUT / "tune.json").exists():
+            prev = json.loads((OUT / "tune.json").read_text())
+            assert prev["sample"] == a.sample and prev["seed"] == a.seed, "merge needs the same training sample"
+            summary = {**prev["summary"], **summary}
         best = min((k for k in summary if k != "shortest"), key=lambda k: summary[k]["score_mean"])
         res = {
             "env": _env(a.time_limit, a.workers),
             "sample": a.sample,
             "seed": a.seed,
-            "grid": TUNE_GRID,
+            "grid": {k: TUNE_GRID[k] for k in summary},
             "best": best,
             "summary": summary,
         }

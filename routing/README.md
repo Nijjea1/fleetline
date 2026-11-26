@@ -6,7 +6,7 @@
 # raw data (~3 GB) into data/raw/almrrc/{train,eval}/ : see data.py for the file list
 uv run fleetline-routing prepare train && uv run fleetline-routing prepare eval
 uv run fleetline-routing tune      # zone penalties, 200 training routes
-uv run fleetline-routing eval      # 3,072 held-out routes, once
+uv run fleetline-routing eval      # 3,052 held-out routes, once
 ```
 
 - **Score:** the challenge's official scorer (downloaded at run time, unmodified). Lower is better; 0 = the driver's exact order. Note: it also scores an exactly reversed order 0.
