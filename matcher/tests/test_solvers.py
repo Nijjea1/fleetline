@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from fleetline_matcher.instances import DAY, Instance, build, objective
-from fleetline_matcher.solvers import SOLVERS
+from fleetline_matcher.solvers import ROUNDED, SOLVERS
 
 
 def tiny():
@@ -30,7 +30,7 @@ def test_solvers_agree(seed):
     totals = {name: objective(inst, fn(inst)[0]) for name, fn in SOLVERS.items()}
     ref = totals["scipy_dense"]
     for name, v in totals.items():
-        assert abs(v - ref) <= (0.4 if name == "ortools_flow" else 1e-6), (name, v, ref)
+        assert abs(v - ref) <= (0.4 if name in ROUNDED else 1e-6), (name, v, ref)
 
 
 @pytest.mark.skipif(not DAY.exists(), reason="needs data/derived (run sim prepare)")
@@ -40,7 +40,7 @@ def test_solvers_agree_on_real_geography(seed):
     totals = {name: objective(inst, fn(inst)[0]) for name, fn in SOLVERS.items()}
     ref = totals["scipy_dense"]
     for name, v in totals.items():
-        assert abs(v - ref) <= (0.4 if name == "ortools_flow" else 1e-6), (name, v, ref)
+        assert abs(v - ref) <= (0.4 if name in ROUNDED else 1e-6), (name, v, ref)
 
 
 def test_roundtrip(tmp_path):

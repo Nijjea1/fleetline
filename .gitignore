@@ -12,6 +12,11 @@ __pycache__/
 .ruff_cache/
 *.egg-info/
 
+# Compiled extensions (matcher/cuda/build.sh)
+*.so
+matcher/cuda/build/
+matcher/gpu_smoke/vecadd
+
 # Go
 core/bin/
 

@@ -19,7 +19,7 @@ from pathlib import Path
 import numpy as np
 
 from .instances import REPO, Instance, build, objective
-from .solvers import SOLVERS
+from .solvers import CUDA_STATS, ROUNDED, SOLVERS
 
 GO_BIN = REPO / "core/bin/assignbench"
 OUT = REPO / "bench/e4"
@@ -41,8 +41,25 @@ def time_py(fn, inst: Instance, reps: int):
     for _ in range(reps):
         match, setup, solve = fn(inst)
         if best is None or solve < best[2]:
-            best = (match, setup, solve)
+            best = (match, setup, solve, dict(CUDA_STATS) if fn is SOLVERS.get("cuda_auction") else {})
     return best
+
+
+def gpu_env() -> dict:
+    """GPU name, driver and CUDA toolkit version, if this machine has them."""
+
+    def out(*cmd):
+        return subprocess.run(cmd, check=False, capture_output=True, text=True).stdout.strip()
+
+    env = {}
+    try:
+        env["gpu"] = out(
+            "nvidia-smi", "--query-gpu=name,driver_version,memory.total,compute_cap", "--format=csv,noheader"
+        )
+        env["nvcc"] = out("nvcc", "--version").splitlines()[-1]
+    except (OSError, IndexError):
+        pass
+    return env
 
 
 def main():
@@ -67,24 +84,25 @@ def main():
                     results[name] = time_py(fn, inst, reps)
                 objs = {name: objective(inst, r[0]) for name, r in results.items()}
                 ref = objs["go_ssp"]
-                # OR-Tools rounds costs to whole milliseconds: allow 1 ms per row.
+                # OR-Tools and the GPU auction round costs to whole milliseconds: allow 1 ms per row.
                 for name, v in objs.items():
-                    tol = 1e-3 * n if name == "ortools_flow" else 1e-6 * max(1.0, abs(ref))
+                    tol = 1e-3 * n if name in ROUNDED else 1e-6 * max(1.0, abs(ref))
                     if abs(v - ref) > tol:
                         raise SystemExit(f"n={n} seed={seed}: {name} total {v} != go_ssp {ref}")
                 matched = int((results["go_ssp"][0] >= 0).sum())
-                for name, (_, setup, solve) in results.items():
-                    rows.append(
-                        {
-                            "n": n,
-                            "seed": seed,
-                            "solver": name,
-                            "solve_s": solve,
-                            "setup_s": setup,
-                            "edges": inst.n_edges,
-                            "matched": matched,
-                        }
-                    )
+                for name, (_, setup, solve, *extra) in results.items():
+                    row = {
+                        "n": n,
+                        "seed": seed,
+                        "solver": name,
+                        "solve_s": solve,
+                        "setup_s": setup,
+                        "edges": inst.n_edges,
+                        "matched": matched,
+                    }
+                    if extra and extra[0]:  # GPU: phases, rounds, and how setup splits
+                        row["gpu"] = extra[0]
+                    rows.append(row)
                 line = "  ".join(f"{k} {v[2] * 1e3:9.2f} ms" for k, v in results.items())
                 print(f"n={n:>6} seed={seed} edges={inst.n_edges:>7} matched={matched:>6}  {line}", flush=True)
 
@@ -95,14 +113,17 @@ def main():
         "processor": platform.processor(),
         "python": platform.python_version(),
         "when": time.strftime("%Y-%m-%d"),
+        **gpu_env(),
     }
     path = OUT / "results" / f"{args.machine}.json"
     path.write_text(json.dumps({"meta": meta, "rows": rows}, indent=1) + "\n")
     print(f"-> {path}")
-    plot(rows)
+    plot()
 
 
-def plot(rows):
+def plot():
+    """One line per solver per machine, from every committed result file: solid for the
+    first machine (the Mac), dashed for the next (the RTX 5060 box)."""
     import matplotlib.pyplot as plt
 
     colors = {
@@ -110,17 +131,22 @@ def plot(rows):
         "scipy_sparse": "#3ddc97",
         "scipy_dense": "#f0a35e",
         "ortools_flow": "#c084fc",
-        "cuda": "#e5484d",
+        "cuda_auction": "#e5484d",
     }
-    fig, ax = plt.subplots(figsize=(7, 4.2))
-    for solver, color in colors.items():
-        pts = {}
-        for r in rows:
-            if r["solver"] == solver:
-                pts.setdefault(r["n"], []).append(r["solve_s"] * 1e3)
-        if pts:
-            ns = sorted(pts)
-            ax.plot(ns, [float(np.median(pts[n])) for n in ns], "o-", color=color, label=solver)
+    styles = ["o-", "s--", "^:"]
+    files = sorted(OUT.joinpath("results").glob("*.json"), key=lambda p: (not p.stem.startswith("cpu"), p.stem))
+    fig, ax = plt.subplots(figsize=(8, 5))
+    for style, f in zip(styles, files):
+        rows = json.loads(f.read_text())["rows"]
+        for solver, color in colors.items():
+            pts = {}
+            for r in rows:
+                if r["solver"] == solver:
+                    pts.setdefault(r["n"], []).append(r["solve_s"] * 1e3)
+            if pts:
+                ns = sorted(pts)
+                med = [float(np.median(pts[n])) for n in ns]
+                ax.plot(ns, med, style, color=color, label=f"{solver} · {f.stem}", ms=4)
     ax.set(
         xscale="log",
         yscale="log",
@@ -129,7 +155,7 @@ def plot(rows):
         title="E4 · assignment solve time vs batch size",
     )
     ax.grid(alpha=0.3, which="both")
-    ax.legend(frameon=False, fontsize=8)
+    ax.legend(frameon=False, fontsize=7, ncol=2)
     ax.spines[["top", "right"]].set_visible(False)
     fig.tight_layout()
     fig.savefig(OUT / "e4.png", dpi=150)

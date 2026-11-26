@@ -27,3 +27,7 @@ dev = [
     "pytest>=9.2.0",
     "ruff>=0.17.6",
 ]
+# Only for building the optional GPU solver (matcher/cuda/build.sh).
+cuda = [
+    "pybind11>=3",
+]

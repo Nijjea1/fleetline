@@ -1,9 +1,11 @@
-"""CPU baselines for E4. Every solver gets the same Instance and returns row -> col (-1 =
+"""Solvers for E4. Every solver gets the same Instance and returns row -> col (-1 =
 unmatched) minimizing sum(cost) + UNMATCHED per unmatched row, so their totals must agree.
 
 Only the solve is timed; converting the edge list into each library's input format is
 reported separately as setup, because a production system would keep data in that
 format already.
+
+cuda_auction (the GPU solver, matcher/cuda) is only present when it has been built there.
 """
 
 import time
@@ -94,4 +96,35 @@ def ortools_flow(inst: Instance):
     return match, t1 - t0, t2 - t1
 
 
+try:
+    from . import _cuda_auction
+except ImportError:  # not built (no CUDA here, e.g. CI or the Mac)
+    _cuda_auction = None
+
+CUDA_STATS: dict = {}  # phases, rounds and the timing split of the last cuda_auction call
+_cuda_warm = False
+
+
+def cuda_auction(inst: Instance):
+    """Forward auction with epsilon-scaling on the GPU (matcher/cuda/auction.cu). Costs are
+    rounded to whole milliseconds like OR-Tools. Setup includes building the GPU's input and
+    both host<->GPU copies; solve is the auction itself."""
+    global _cuda_warm
+    if not _cuda_warm:  # first call pays for CUDA context and kernel loading: keep it out of timings
+        _cuda_auction.solve(1, 1, np.zeros(1, np.int32), np.zeros(1, np.int32), np.ones(1, np.int64), 10**9)
+        _cuda_warm = True
+    t0 = time.perf_counter()
+    rows, cols, costs = _dedupe(inst)
+    ms = np.round(costs * 1000).astype(np.int64)
+    t1 = time.perf_counter()
+    match, st = _cuda_auction.solve(inst.n_rows, inst.n_cols, rows, cols, ms, round(UNMATCHED * 1000))
+    CUDA_STATS.clear()
+    CUDA_STATS.update(st)
+    return match.astype(np.int64), (t1 - t0) + st["setup_s"] + st["copy_back_s"], st["solve_s"]
+
+
 SOLVERS = {"scipy_dense": scipy_dense, "scipy_sparse": scipy_sparse, "ortools_flow": ortools_flow}
+if _cuda_auction is not None:
+    SOLVERS["cuda_auction"] = cuda_auction
+# Solvers that work on millisecond-rounded costs: their totals may differ by up to 1 ms per row.
+ROUNDED = {"ortools_flow", "cuda_auction"}
