@@ -2,14 +2,14 @@
 # E6 on the RTX 5060: build TensorRT engines from the same ONNX file and time them.
 #
 # STATUS: written on the Mac, NOT YET RUN. Run on the GPU machine after copying
-# data/models/eta_residual.onnx there. Results go in ml/results/e6_tensorrt.json by hand
+# data/models/eta_residual_mlp.onnx there. Results go in ml/results/e6_tensorrt.json by hand
 # (or extend this script) together with the GPU/driver/TensorRT versions.
 #
 # FP32 and FP16 are measured here with trtexec. INT8 needs a calibration set (real
 # inputs, so TensorRT can pick per-tensor scales) to say anything about accuracy; that
 # is a Python calibrator using ~10k rows of val.parquet, to be added on the GPU box.
 set -euo pipefail
-ONNX="${1:-data/models/eta_residual.onnx}"
+ONNX="${1:-data/models/eta_residual_mlp.onnx}"
 OUT="${OUT:-data/models}"
 
 for B in 1 32 256 1024 8192; do

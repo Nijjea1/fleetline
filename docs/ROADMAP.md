@@ -1,6 +1,7 @@
 # Roadmap: what's left (as of 2026-11-25)
 
 Phase 1 is done (see `PHASE1_CHECKLIST.md`). This list covers everything else in `PROJECT_SCOPE.md`, in build order.
+Steps for the GPU machine: [`GPU_MACHINE.md`](GPU_MACHINE.md).
 **Where:** Mac = I can build and run it here · GPU = needs the RTX 5060 machine (I write the code, you run it) · You = your decision or your account.
 
 ## Phase 2 · Matching + GPU

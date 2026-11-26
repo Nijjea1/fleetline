@@ -4,9 +4,12 @@ set -euo pipefail
 cd "$(dirname "$0")"
 nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv
 nvcc --version | tail -1
-nvcc -O2 -o vecadd vecadd.cu && ./vecadd
-# F2: PyTorch with CUDA (install the CUDA wheel in ml/: see ml/README.md)
-cd ../../ml && uv run python - <<'PY'
+nvcc -O2 -arch=native -o vecadd vecadd.cu && ./vecadd
+# F2: PyTorch with CUDA. ml/'s lockfile gives Linux the CPU-only wheel (for CI), so swap
+# in the CUDA 12.8 build (needed for the RTX 50 series) and run without re-syncing.
+cd ../../ml && uv sync -q
+uv pip install -q --reinstall torch --index-url https://download.pytorch.org/whl/cu128
+uv run --no-sync python - <<'PY'
 import time, torch
 assert torch.cuda.is_available(), "PyTorch can't see a CUDA GPU"
 print("torch", torch.__version__, "cuda", torch.version.cuda, "|", torch.cuda.get_device_name(0))
