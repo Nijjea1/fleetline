@@ -11,7 +11,7 @@ Phase 1 is done (see `PHASE1_CHECKLIST.md`). This list covers everything else in
 | 2.3 | E4 CPU: Go SSP vs SciPy vs OR-Tools, 100–100k riders | Mac | ✅ |
 | 2.4 | Driver accept/decline + response delay, fitted on Sep 16, checked on Sep 23 (closes the realism gap, D-015) | Mac | ✅ built; realism gain did not hold on Sep 23 (D-017), so off by default |
 | 2.5 | E2b: does batched still win when drivers decline? | Mac | ✅ yes: −16.9% mean wait with 24–27% of offers declined |
-| 2.6 | Dashboard: greedy vs batched side by side on the same morning | Mac | ⬜ |
+| 2.6 | Dashboard: greedy vs batched side by side on the same morning | Mac | ✅ `?mode=compare` |
 | 2.7 | GPU smoke test: `matcher/gpu_smoke/run.sh` | GPU | ⬜ needs you |
 | 2.8 | CUDA assignment solver (auction algorithm) + pybind11, joins E4; Nsight profile | GPU | ⬜ code here, run there |
 | 2.9 | NVIDIA cuOpt in E4 | GPU (Linux/WSL) | ⬜ |

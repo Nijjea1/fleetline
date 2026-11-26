@@ -31,7 +31,13 @@ export type Meta = {
   pickups: number;
   minutes: Minute[];
   params: Record<string, string>;
-  summary: { requests: number; served: number; unserved_rate: number };
+  summary: {
+    requests: number;
+    served: number;
+    unserved_rate: number;
+    sim_wait: { mean_s: number; p50_s: number; p90_s: number };
+    pickup_eta: { mean_s: number };
+  };
 };
 
 export type Frame = {

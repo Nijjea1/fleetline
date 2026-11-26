@@ -316,6 +316,12 @@
    "p50_s": 280,
    "p90_s": 639
   },
+  "pickup_eta": {
+   "n": 12917,
+   "mean_s": 230.4398080049547,
+   "p50_s": 170,
+   "p90_s": 529
+  },
   "served_by_kind": {
    "av": 495,
    "human": 12422
@@ -342,7 +348,7 @@
    }
   ],
   "dispatch_rounds": 28801,
-  "runtime_s": 7.009882791
+  "runtime_s": 13.914861667
  },
  "params": {
   "max_pickup": "10m0s",

@@ -81,6 +81,7 @@ func main() {
 		to         = flag.String("to", "08:20", "window end HH:MM")
 		frame      = flag.Duration("frame", 10*time.Second, "simulated time between frames")
 		maxPickup  = flag.Duration("max-pickup", 600*time.Second, "greedy pickup-ETA cap")
+		policyName = flag.String("policy", "greedy", "dispatch policy: greedy or batched (age weight 3, D-016)")
 		out        = flag.String("out", "../web/public/replay", "output directory")
 		// Same conditions the per-hour calibration was fitted in (full day from 01:00).
 		// A short warm-up starts the fleet mostly idle and makes waits look far too good.
@@ -115,9 +116,19 @@ func main() {
 	var frames []fr
 	statusCode := map[model.VehicleStatus]byte{model.StatusIdle: 1, model.StatusEnRoute: 2, model.StatusOnTrip: 3}
 
+	var policy dispatch.Policy
+	switch *policyName {
+	case "greedy":
+		policy = &dispatch.Greedy{Travel: travel, RadiusMi: 3, K: 8, MaxPickupSec: maxPickup.Seconds()}
+	case "batched":
+		policy = &dispatch.Batched{Travel: travel, RadiusMi: 3, K: 8, MaxPickupSec: maxPickup.Seconds(), AgeWeight: 3}
+	default:
+		log.Error("unknown -policy", "policy", *policyName)
+		os.Exit(1)
+	}
 	cfg := offline.Config{
 		Travel: travel,
-		Policy: &dispatch.Greedy{Travel: travel, RadiusMi: 3, K: 8, MaxPickupSec: maxPickup.Seconds()},
+		Policy: policy,
 		From:   fromMs, To: toMs, Warmup: time.Duration(fromMs-day.Add(hhmm(log, *simFrom)).UnixMilli()) * time.Millisecond,
 		Drain:    30 * time.Minute,
 		Patience: 10 * time.Minute, Window: time.Second,
@@ -233,7 +244,7 @@ func main() {
 		FrameS: int(frame.Seconds()), Frames: len(frames), Vehicles: n, Kinds: string(kinds),
 		BBox: bbox, RobotaxiZone: geo.RobotaxiZone, Pickups: npick, Minutes: minutes,
 		Summary: sum,
-		Params: map[string]string{"policy": "greedy", "max_pickup": maxPickup.String(), "sim_from": *simFrom,
+		Params: map[string]string{"policy": *policyName, "max_pickup": maxPickup.String(), "sim_from": *simFrom,
 			"supply": filepath.Base(*supplyFile), "seed": "7"},
 	}
 	must(log, os.MkdirAll(*out, 0o755))

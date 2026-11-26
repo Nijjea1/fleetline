@@ -1,36 +1,28 @@
 "use client";
 import type { Layer, PickingInfo } from "@deck.gl/core";
-import { PolygonLayer, ScatterplotLayer } from "@deck.gl/layers";
+import { ScatterplotLayer } from "@deck.gl/layers";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { clock12, longDay, mmss, n } from "@/lib/format";
 import { fetchLive, type LiveSnapshot } from "@/lib/live";
-import { loadReplay, pendingAt, vehiclesAt, type Replay } from "@/lib/replay";
-import { RIDER, ROBOTAXI, STATUS_BY_CODE } from "@/lib/theme";
+import { loadReplay, type Replay } from "@/lib/replay";
+import { STATUS_BY_CODE } from "@/lib/theme";
 import { About } from "./About";
+import { CompareView } from "./Compare";
+import { Notice } from "./Notice";
 import { MapView } from "./MapView";
 import { Brand, FleetStatus, MapKey, Section, type Mode } from "./Panel";
 import { Timeline } from "./Timeline";
 import { WaitChart } from "./WaitChart";
+import { CAR_STYLE, carLabel, replayLayers, replayTooltip, RIDER_STYLE, useClock, useFrame } from "./replayLayers";
 
-const PICKUP_FADE_S = 25;
 const SEEN_KEY = "fleetline.seen-intro";
 
-// Dots scale with zoom (meters), clamped so they stay visible zoomed out and don't turn
-// into blobs zoomed in.
-const CAR_STYLE = { radiusUnits: "meters", getRadius: 22, radiusMinPixels: 1.3, radiusMaxPixels: 6 } as const;
-const RIDER_STYLE = {
-  radiusUnits: "meters",
-  getRadius: 34,
-  radiusMinPixels: 2,
-  radiusMaxPixels: 8,
-  getFillColor: [...RIDER, 240] as [number, number, number, number],
-} as const;
-
 export default function Dashboard() {
-  // ?mode=live opens live mode directly (shareable, and scriptable for screenshots).
-  const [mode, setMode] = useState<Mode>(() =>
-    typeof window !== "undefined" && new URLSearchParams(window.location.search).get("mode") === "live" ? "live" : "replay",
-  );
+  // ?mode=live / ?mode=compare open that view directly (shareable, scriptable for screenshots).
+  const [mode, setMode] = useState<Mode>(() => {
+    const m = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("mode") : null;
+    return m === "live" || m === "compare" ? m : "replay";
+  });
   const [about, setAbout] = useState(false);
   useEffect(() => {
     if (!localStorage.getItem(SEEN_KEY) && !new URLSearchParams(window.location.search).has("nointro")) setAbout(true);
@@ -44,14 +36,12 @@ export default function Dashboard() {
   const brand = <Brand mode={mode} setMode={setMode} onAbout={openAbout} />;
   return (
     <main className="shell">
-      {mode === "replay" ? <ReplayView brand={brand} onAbout={openAbout} /> : <LiveView brand={brand} />}
+      {mode === "replay" && <ReplayView brand={brand} onAbout={openAbout} />}
+      {mode === "compare" && <CompareView brand={brand} />}
+      {mode === "live" && <LiveView brand={brand} />}
       <About open={about} onClose={closeAbout} />
     </main>
   );
-}
-
-function carLabel(status: number, av: boolean) {
-  return `${av ? "Robotaxi" : "Human driver"} · ${STATUS_BY_CODE[status]?.label ?? "Offline"}`;
 }
 
 // ---------------------------------------------------------------- replay
@@ -59,9 +49,6 @@ function carLabel(status: number, av: boolean) {
 function ReplayView({ brand, onAbout }: { brand: ReactNode; onAbout: () => void }) {
   const [replay, setReplay] = useState<Replay | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const [t, setT] = useState(0);
-  const [playing, setPlaying] = useState(true);
-  const [speed, setSpeed] = useState(30);
 
   useEffect(() => {
     loadReplay().then(setReplay, (e) => setErr(String(e)));
@@ -70,93 +57,17 @@ function ReplayView({ brand, onAbout }: { brand: ReactNode; onAbout: () => void 
   // Frames are snapshots at 0, 10, … s; the window they cover ends one frame later.
   const duration = replay ? (replay.meta.frames - 1) * replay.meta.frame_s : 0;
   const endMs = replay ? replay.meta.start_ms + replay.meta.frames * replay.meta.frame_s * 1000 : 0;
-
-  // Animation clock: simulated seconds advance at `speed` per wall second, looping.
-  useEffect(() => {
-    if (!replay || !playing) return;
-    let raf = 0;
-    let last = performance.now();
-    const tick = (now: number) => {
-      const dt = Math.min(0.1, (now - last) / 1000); // no jump after a background tab
-      last = now;
-      setT((prev) => (prev + dt * speed) % duration);
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [replay, playing, speed, duration]);
-
-  const frame = useMemo(() => {
-    if (!replay) return null;
-    const count = replay.meta.vehicles;
-    // Fresh arrays each frame so deck.gl sees new attribute data.
-    const out = { pos: new Float32Array(2 * count), col: new Uint8Array(4 * count), counts: [0, 0, 0, 0] };
-    vehiclesAt(replay, t, out);
-    return { ...out, pending: pendingAt(replay, t) };
-  }, [replay, t]);
-
-  const tooltip = useCallback(
-    (info: PickingInfo) => {
-      if (!replay) return null;
-      const id = info.layer?.id;
-      if (id === "vehicles") {
-        const f = replay.frames[Math.min(Math.floor(t / replay.meta.frame_s), replay.frames.length - 1)];
-        return carLabel(f.status[info.index], replay.isAV[info.index] === 1);
-      }
-      if (id === "pending") return "Rider waiting for a car";
-      if (id === "pickups") {
-        const p = info.object as { wait: number; av: boolean };
-        return `Picked up by a ${p.av ? "robotaxi" : "driver"} after a ${mmss(p.wait)} wait`;
-      }
-      return null;
-    },
-    [replay, t],
-  );
+  const { t, setT, playing, setPlaying, speed, setSpeed } = useClock(duration);
+  const frame = useFrame(replay, t);
+  const tooltip = useMemo(() => (replay ? replayTooltip(replay, t) : undefined), [replay, t]);
 
   if (err) return <Notice title="Couldn't load the recording" body={err} />;
   if (!replay || !frame) return <Notice title="Loading a recorded NYC morning…" body="29,087 cars · 20 minutes · about 6 MB" spinner />;
 
   const { meta } = replay;
-  const recent = replay.pickups.filter((p) => p.t <= t && t - p.t < PICKUP_FADE_S);
   const mi = Math.min(Math.floor(t / 60), meta.minutes.length - 1);
   const minute = meta.minutes[mi];
-
-  const layers: Layer[] = [
-    new PolygonLayer({
-      id: "zone",
-      data: [{ polygon: meta.robotaxi_zone }],
-      getPolygon: (d: { polygon: [number, number][] }) => d.polygon,
-      getFillColor: [...ROBOTAXI, 18],
-      getLineColor: [...ROBOTAXI, 170],
-      lineWidthMinPixels: 1.5,
-    }),
-    new ScatterplotLayer({
-      id: "vehicles",
-      data: { length: meta.vehicles, attributes: { getPosition: { value: frame.pos, size: 2 }, getFillColor: { value: frame.col, size: 4 } } },
-      ...CAR_STYLE,
-      pickable: true,
-    }),
-    new ScatterplotLayer({
-      id: "pending",
-      data: { length: frame.pending.length / 2, attributes: { getPosition: { value: frame.pending, size: 2 } } },
-      ...RIDER_STYLE,
-      pickable: true,
-    }),
-    new ScatterplotLayer({
-      id: "pickups",
-      data: recent,
-      getPosition: (p: { lon: number; lat: number }) => [p.lon, p.lat],
-      radiusUnits: "pixels",
-      getRadius: (p: { t: number }) => 3 + ((t - p.t) / PICKUP_FADE_S) * 12,
-      stroked: true,
-      filled: false,
-      getLineColor: (p: { t: number; av: boolean }) =>
-        [...(p.av ? ROBOTAXI : [255, 255, 255]), Math.round(170 * (1 - (t - p.t) / PICKUP_FADE_S))] as [number, number, number, number],
-      lineWidthMinPixels: 1,
-      pickable: true,
-      updateTriggers: { getRadius: t, getLineColor: t },
-    }),
-  ];
+  const layers = replayLayers(replay, frame, t);
 
   return (
     <>
@@ -183,9 +94,17 @@ function ReplayView({ brand, onAbout }: { brand: ReactNode; onAbout: () => void 
               </span>
             </div>
           </div>
-          <WaitChart minutes={meta.minutes} t={t} startMs={meta.start_ms} />
+          <WaitChart
+            series={[
+              { values: meta.minutes.map((m) => m.real_p50_s), style: "ref" },
+              { values: meta.minutes.map((m) => m.sim_p50_s), style: "main" },
+            ]}
+            t={t}
+            startMs={meta.start_ms}
+            label="Median rider wait per minute, Fleetline vs actual"
+          />
           <p className="note">
-            Not a like-for-like win: real waits include drivers accepting a request, which isn&apos;t simulated yet.{" "}
+            Not a like-for-like win: real waits include drivers accepting a request, which this run doesn&apos;t model.{" "}
             <button className="link" onClick={onAbout}>
               More
             </button>
@@ -356,15 +275,5 @@ function LiveView({ brand }: { brand: ReactNode }) {
         </div>
       )}
     </>
-  );
-}
-
-function Notice({ title, body, spinner }: { title: string; body: string; spinner?: boolean }) {
-  return (
-    <div className="notice">
-      {spinner && <div className="spinner" aria-hidden />}
-      <h1>{title}</h1>
-      <p className="muted">{body}</p>
-    </div>
   );
 }

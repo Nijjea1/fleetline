@@ -153,6 +153,30 @@ input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border: 0; bord
 .attrib a { color: var(--text-3); text-decoration: none; }
 .attrib a:hover { color: var(--text-2); text-decoration: underline; }
 
+/* ---------------------------------------------------------------- compare */
+.compare { position: absolute; inset: 0; padding-left: calc(var(--panel-w) + 2 * var(--gap)); display: grid;
+  grid-template-columns: 1fr 1fr; gap: 2px; background: var(--border-strong); }
+.compare::before { content: ""; position: absolute; inset: 0 auto 0 0; width: calc(var(--panel-w) + 2 * var(--gap)); background: var(--bg); }
+.pane { position: relative; overflow: hidden; background: var(--bg); }
+.pane-head { position: absolute; z-index: 2; top: var(--gap); left: var(--gap); right: var(--gap); display: flex;
+  align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 8px 28px rgba(0,0,0,.4); }
+.pane-head.batched { border-color: rgba(255,255,255,.22); }
+.pane-head h2 { margin: 0; font-size: 15px; font-weight: 650; letter-spacing: -.01em; }
+.pane-head p { margin: 2px 0 0; font-size: 12px; color: var(--text-3); line-height: 1.35; }
+.pane-head dl { display: flex; gap: 16px; margin: 0; flex: none; }
+.pane-head dl div { display: flex; flex-direction: column; align-items: flex-end; }
+.pane-head dt { font-size: 10.5px; color: var(--text-3); text-transform: uppercase; letter-spacing: .06em; }
+.pane-head dd { margin: 0; font: 600 18px/1.2 var(--mono); font-variant-numeric: tabular-nums; }
+.pane-head dd.rider-num, .rider-word { color: #ff5d73; }
+.vs { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 12.5px; }
+.vs th { font-size: 11px; font-weight: 600; color: var(--text-3); text-align: right; padding: 0 0 4px; }
+.vs td { padding: 5px 0; border-top: 1px solid var(--border); color: var(--text-2); }
+.vs td + td { text-align: right; font: 500 13px var(--mono); font-variant-numeric: tabular-nums; color: var(--text); width: 64px; }
+.vs td:nth-child(2) { color: var(--real); }
+.delta { font: 600 11.5px var(--mono); padding: 1px 6px; border-radius: 99px; }
+.delta.good { background: rgba(61,220,151,.14); color: #3ddc97; }
+
 /* ---------------------------------------------------------------- about */
 .about { width: min(760px, calc(100% - 32px)); max-height: calc(100% - 48px); padding: 0; border: 1px solid var(--border-strong);
   border-radius: 18px; background: #11151c; color: var(--text); box-shadow: 0 30px 80px rgba(0,0,0,.6); }
@@ -200,5 +224,16 @@ input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border: 0; bord
   .about-body { padding: 22px; }
   .zoom { display: none; }
   .attrib { left: var(--gap); right: auto; }
+  /* Compare: the two maps share the top half, side by side. */
+  .compare { padding-left: 0; bottom: 50%; }
+  .compare::before { display: none; }
+  .pane-head { flex-direction: column; align-items: flex-start; gap: 4px; padding: 6px 8px; top: 6px; left: 6px; right: 6px; }
+  .pane-head p { display: none; }
+  .pane-head dl { gap: 10px; }
+  .pane-head dl div { align-items: flex-start; }
+  .pane-head dd { font-size: 14px; }
+  .pane-head h2 { font-size: 13px; }
+  .pane-head dt { font-size: 9px; letter-spacing: .03em; }
+  .compare ~ .panel { max-height: calc(50% - 96px - 2 * var(--gap)); }
 }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }

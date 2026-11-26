@@ -2,7 +2,7 @@
 
 **Real-time ride dispatch for a mixed fleet of human drivers and robotaxis, replaying a real day of NYC Uber/Lyft demand.** Go streaming core on Kafka (Redpanda) + Redis, a deterministic simulator calibrated against real wait times, an ML arrival-time model, and a live map.
 
-**▶ Live demo: [fleetline-sigma.vercel.app](https://fleetline-sigma.vercel.app)**: 29,087 vehicles serving 12,917 real ride requests, 08:00–08:20 on Wed Sep 16, 2026.
+**▶ Live demo: [fleetline-sigma.vercel.app](https://fleetline-sigma.vercel.app)**: 29,087 vehicles serving 12,917 real ride requests, 08:00–08:20 on Wed Sep 16, 2026. **[Compare view](https://fleetline-sigma.vercel.app/?mode=compare)**: greedy and batched matching side by side on the same morning (mean wait 4:43 → 3:23 in that window).
 
 ![Architecture](docs/architecture.svg)
 

@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { n, pct } from "@/lib/format";
 import { css, RIDER, ROBOTAXI, STATUS } from "@/lib/theme";
 
-export type Mode = "replay" | "live";
+export type Mode = "replay" | "compare" | "live";
 
 export function Brand({ mode, setMode, onAbout }: { mode: Mode; setMode: (m: Mode) => void; onAbout: () => void }) {
   return (
@@ -18,13 +18,18 @@ export function Brand({ mode, setMode, onAbout }: { mode: Mode; setMode: (m: Mod
         </button>
       </div>
       <p className="tagline">Real-time ride dispatch, replaying real New York City Uber &amp; Lyft demand.</p>
-      <div className="seg seg-full" role="tablist" aria-label="Data source">
-        <button role="tab" aria-selected={mode === "replay"} className={mode === "replay" ? "on" : ""} onClick={() => setMode("replay")}>
-          Recorded morning
-        </button>
-        <button role="tab" aria-selected={mode === "live"} className={mode === "live" ? "on" : ""} onClick={() => setMode("live")}>
-          Live system
-        </button>
+      <div className="seg seg-full" role="tablist" aria-label="View">
+        {(
+          [
+            ["replay", "Replay"],
+            ["compare", "Compare"],
+            ["live", "Live"],
+          ] as const
+        ).map(([m, label]) => (
+          <button key={m} role="tab" aria-selected={mode === m} className={mode === m ? "on" : ""} onClick={() => setMode(m)}>
+            {label}
+          </button>
+        ))}
       </div>
     </header>
   );

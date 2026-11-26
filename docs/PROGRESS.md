@@ -121,3 +121,7 @@ Reference for the same 07:00–07:20 window, real Uber/Lyft: **mean 381 s, p50 2
 ### Resume bullet (E4, CPU)
 - Wrote an exact sparse assignment solver in Go that exploits city geography (near-linear scaling): **168 ms for 100k riders, 28× faster than Google OR-Tools and 217× faster than SciPy**, all verified to the same optimum.
 - **Driver offers (D-017) + E2b**: offer model (answer delay, ETA-dependent declines; robotaxis instant). Fitted on Sep 16 (hourly error 0.191 → 0.138), but on held-out Sep 23 it didn't transfer (hours within 15%: 7 → 4), so it is not claimed as realism. As a stress test: batched still −16.9% mean wait vs greedy with 24–27% declines. Ran with 2–4 parallel jobs; the user noticed heat, so default to JOBS=2.
+
+## 2026-11-26
+- **Dashboard compare view** (`?mode=compare`): two maps on one camera and one clock, greedy vs batched on the same 08:00–08:20 Sep 16 morning. `export-replay -policy batched` writes `web/public/replay-batched/`, and the greedy export is byte-identical to before. In that window the mean wait goes 4:43 → 3:23 (−28%) and p90 11:08 → 8:05. The full-day held-out figure (−18.6%) is quoted next to it. I dropped a first "avg wait of pickups so far" stat because it misled: batched picks up more long-waiting riders, so that average briefly looked worse.
+- A Turbopack "ModuleGraph … canceled" build panic came from a stale `.next` cache. `rm -rf .next` fixed it.
