@@ -1,5 +1,5 @@
 // E4 GPU solver: forward auction with epsilon-scaling (Bertsekas) for the sparse
-// rider -> car assignment. See matcher/README.md and docs/learning/10-gpu-auction.md.
+// rider -> car assignment. See matcher/README.md, docs/learning/10-gpu-auction.md, D-018.
 //
 // The problem is rectangular (n riders, m cars, each rider may stay unmatched at a fixed
 // cost). Forward auction is only guaranteed optimal on square problems, so we solve an
@@ -13,22 +13,41 @@
 // A matched pair (i, j) frees dummy m+i, which slack j (adjacent to i via j) takes, so every
 // rider assignment extends to a perfect matching with the same cost and vice versa.
 //
-// Exactness: costs are whole milliseconds, multiplied by K = N + 1. Auction ends within
-// N * eps of the optimum, so the last phase at eps = 1 is off by less than K, i.e. less
-// than one millisecond: it is the exact optimum of the millisecond-rounded problem.
+// Exactness. Costs are whole milliseconds times K = N + 1. Auction ends within N * eps of
+// the optimum, so the last phase at eps = 1 is off by less than K, i.e. less than one
+// millisecond: it is the exact optimum of the millisecond-rounded problem. We usually stop
+// sooner: after each phase the duality gap (sum over persons of best value minus value
+// of the assigned object; every object is assigned) bounds the distance to the optimum,
+// and every total is a multiple of K, so a gap below K certifies the current assignment.
+//
+// Phases. Prices carry over between eps phases, and so do assignments that still satisfy
+// eps-complementary slackness at the new eps (any such start is valid on a square problem);
+// only the persons that break it bid again.
+//
+// Speed. Each phase is one cooperative kernel: grid-wide barriers between the bid /
+// resolve / award steps, no launches or host round trips per round. Late in a phase only
+// a few persons are still bidding (one round per step of an eviction chain), so once the
+// worklist fits in one block, block 0 finishes the phase alone with cheap block barriers
+// while the rest of the grid exits. One launch per phase (not per solve) keeps each
+// kernel short: Windows (and so WSL) kills GPU kernels that run for more than ~2 s.
 #include "auction.h"
 
+#include <cooperative_groups.h>
 #include <cuda_runtime.h>
 
 #include <algorithm>
 #include <chrono>
 #include <climits>
-#include <cstdio>
 #include <stdexcept>
 #include <string>
 
+namespace cg = cooperative_groups;
+
 namespace {
 
+constexpr int THREADS = 256;
+constexpr int SMALL = THREADS * 4;  // worklist size at which block 0 takes over
+constexpr int MAX_PHASES = 64;
 constexpr long long NEG = LLONG_MIN / 4;
 
 #define CK(x)                                                                              \
@@ -42,104 +61,174 @@ double now() {
   return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
 }
 
-struct Dev {
-  int *off = nullptr, *obj = nullptr;  // CSR by person
-  long long* ben = nullptr;            // benefit per edge (scaled, <= 0)
-  long long* price = nullptr;          // per object
-  int* owner = nullptr;                // object -> person or -1
-  int* assign = nullptr;               // person -> object or -1
-  long long* bid_val = nullptr;        // person's current bid
-  int* bid_obj = nullptr;              // object the person bids on
-  long long* obj_best = nullptr;       // highest bid this round per object
-  int* obj_win = nullptr;              // lowest person id among the highest bidders
-  int* wl = nullptr;                   // two worklists of unassigned persons, N each
-  int* cnt = nullptr;                  // their two lengths
-  ~Dev() {
-    for (void* p : {(void*)off, (void*)obj, (void*)ben, (void*)price, (void*)owner, (void*)assign,
-                    (void*)bid_val, (void*)bid_obj, (void*)obj_best, (void*)obj_win, (void*)wl, (void*)cnt})
-      if (p) cudaFree(p);
-  }
+struct Params {
+  int N;                 // persons = objects
+  const int* off;        // CSR by person: off[N + 1]
+  const int* obj;        // object per edge
+  const long long* ben;  // benefit per edge (scaled, <= 0)
+  long long lone_incr;   // bid increment for a person with a single option
+  long long* price;      // per object
+  int* owner;            // object -> person or -1
+  int* assign;           // person -> object or -1
+  long long* bid_val;    // per person
+  int* bid_obj;          // per person
+  long long* obj_best;   // per object: highest bid this round
+  int* obj_win;          // per object: lowest person id among the highest bidders
+  int* wl;               // two worklists of N persons
+  int* cnt;              // [0..1] worklist lengths
+  long long* stats;      // [0] rounds, [1] bids, [2 + phase] rounds in that phase
 };
 
-// Phase start: everyone unassigned, all persons on worklist 0. Prices carry over.
-__global__ void init_phase(int N, int* owner, int* assign, int* wl0, int* cnt, long long* obj_best, int* obj_win) {
-  for (int t = blockIdx.x * blockDim.x + threadIdx.x; t < N; t += gridDim.x * blockDim.x) {
-    owner[t] = -1;
-    assign[t] = -1;
-    wl0[t] = t;
-    obj_best[t] = 0;
-    obj_win[t] = INT_MAX;
-  }
-  if (blockIdx.x == 0 && threadIdx.x == 0) {
-    cnt[0] = N;
-    cnt[1] = 0;
-  }
-}
-
-// Every unassigned person finds its best and second-best object (value = benefit - price)
-// and bids the price that makes it indifferent between them, plus eps.
-__global__ void bid(const int* wl_in, const int* cnt_in, int* cnt_out, const int* off, const int* obj,
-                    const long long* ben, const long long* price, long long* bid_val, int* bid_obj,
-                    long long* obj_best, long long eps, long long lone_incr) {
-  int n = *cnt_in;
-  if (blockIdx.x == 0 && threadIdx.x == 0) *cnt_out = 0;  // last read by the previous round's award
-  for (int t = blockIdx.x * blockDim.x + threadIdx.x; t < n; t += gridDim.x * blockDim.x) {
-    int i = wl_in[t];
-    long long v1 = NEG, v2 = NEG;
-    int j1 = -1;
-    for (int e = off[i]; e < off[i + 1]; ++e) {
-      int j = obj[e];
-      long long v = ben[e] - price[j];
-      if (v > v1) {
-        v2 = v1;
-        v1 = v;
-        j1 = j;
-      } else if (v > v2) {
-        v2 = v;
-      }
+// Best and second-best value (benefit - price) over a person's options.
+__device__ inline void top2(const Params& P, int i, long long& v1, long long& v2, int& j1) {
+  v1 = NEG;
+  v2 = NEG;
+  j1 = -1;
+  for (int e = P.off[i]; e < P.off[i + 1]; ++e) {
+    long long v = P.ben[e] - P.price[P.obj[e]];
+    if (v > v1) {
+      v2 = v1;
+      v1 = v;
+      j1 = P.obj[e];
+    } else if (v > v2) {
+      v2 = v;
     }
-    long long b = price[j1] + (v2 == NEG ? lone_incr : v1 - v2) + eps;
-    bid_val[i] = b;
-    bid_obj[i] = j1;
-    atomicMax(&obj_best[j1], b);
   }
 }
 
-// Ties on the highest bid go to the lowest person id (deterministic).
-__global__ void resolve(const int* wl_in, const int* cnt_in, const long long* bid_val, const int* bid_obj,
-                        const long long* obj_best, int* obj_win) {
-  int n = *cnt_in;
-  for (int t = blockIdx.x * blockDim.x + threadIdx.x; t < n; t += gridDim.x * blockDim.x) {
-    int i = wl_in[t];
-    int j = bid_obj[i];
-    if (bid_val[i] == obj_best[j]) atomicMin(&obj_win[j], i);
-  }
+__device__ inline void push(const Params& P, int out, int i) {
+  P.wl[(size_t)out * P.N + atomicAdd(&P.cnt[out], 1)] = i;
 }
 
-// Winners take their object at the bid price; the evicted owner and the losers go on the
-// next worklist. Only the (unique) winner touches its object, so it also resets it.
-__global__ void award(const int* wl_in, const int* cnt_in, int* wl_out, int* cnt_out, const long long* bid_val,
-                      const int* bid_obj, long long* obj_best, int* obj_win, long long* price, int* owner,
-                      int* assign) {
-  int n = *cnt_in;
-  for (int t = blockIdx.x * blockDim.x + threadIdx.x; t < n; t += gridDim.x * blockDim.x) {
+// One auction round over worklist entries t0, t0 + step, ... < n. `sync` is a grid or
+// block barrier.
+template <class Sync>
+__device__ void round(const Params& P, int in, int out, int n, int t0, int step, long long eps, Sync sync) {
+  const int* wl_in = P.wl + (size_t)in * P.N;
+  // Bid: the price that makes the person indifferent between its two best options, plus eps.
+  for (int t = t0; t < n; t += step) {
     int i = wl_in[t];
-    int j = bid_obj[i];
-    if (obj_win[j] == i) {
-      int old = owner[j];
-      owner[j] = i;
-      assign[i] = j;
-      price[j] = bid_val[i];
-      obj_best[j] = 0;
-      obj_win[j] = INT_MAX;
+    long long v1, v2;
+    int j1;
+    top2(P, i, v1, v2, j1);
+    long long b = P.price[j1] + (v2 == NEG ? P.lone_incr : v1 - v2) + eps;
+    P.bid_obj[i] = j1;
+    P.bid_val[i] = b;
+    atomicMax(&P.obj_best[j1], b);
+  }
+  sync();
+  // Ties on the highest bid go to the lowest person id (deterministic).
+  for (int t = t0; t < n; t += step) {
+    int i = wl_in[t];
+    int j = P.bid_obj[i];
+    if (P.bid_val[i] == P.obj_best[j]) atomicMin(&P.obj_win[j], i);
+  }
+  sync();
+  // Award: winners take the object at their bid; evicted owners and losers bid again.
+  // Only the unique winner touches its object, so it also resets the object's round state.
+  for (int t = t0; t < n; t += step) {
+    int i = wl_in[t];
+    int j = P.bid_obj[i];
+    if (P.obj_win[j] == i) {
+      int old = P.owner[j];
+      P.owner[j] = i;
+      P.assign[i] = j;
+      P.price[j] = P.bid_val[i];
+      P.obj_best[j] = 0;
+      P.obj_win[j] = INT_MAX;
       if (old >= 0) {
-        assign[old] = -1;
-        wl_out[atomicAdd(cnt_out, 1)] = old;
+        P.assign[old] = -1;
+        push(P, out, old);
       }
     } else {
-      wl_out[atomicAdd(cnt_out, 1)] = i;
+      push(P, out, i);
     }
   }
+  sync();
+}
+
+__global__ void phase_kernel(Params P, int phase, long long eps) {
+  cg::grid_group g = cg::this_grid();
+  cg::thread_block blk = cg::this_thread_block();
+  const int tid = g.thread_rank(), nthreads = g.size();
+  const bool lead = tid == 0;
+
+  if (phase == 0) {
+    for (int t = tid; t < P.N; t += nthreads) {
+      P.price[t] = 0;
+      P.owner[t] = -1;
+      P.assign[t] = -1;
+      P.obj_best[t] = 0;
+      P.obj_win[t] = INT_MAX;
+    }
+  } else {
+    // Keep assignments that satisfy eps-CS at the new eps; free the rest.
+    for (int i = tid; i < P.N; i += nthreads) {
+      int a = P.assign[i];
+      long long v1, v2, cur = NEG;
+      int j1;
+      top2(P, i, v1, v2, j1);
+      for (int e = P.off[i]; e < P.off[i + 1]; ++e)
+        if (P.obj[e] == a) cur = P.ben[e] - P.price[a];
+      if (cur < v1 - eps) {
+        P.owner[a] = -1;
+        P.assign[i] = -1;
+      }
+    }
+  }
+  if (lead) P.cnt[0] = P.cnt[1] = 0;
+  g.sync();
+  for (int i = tid; i < P.N; i += nthreads)
+    if (P.assign[i] < 0) push(P, 0, i);
+  g.sync();
+
+  long long rounds = 0;
+  for (int r = 0;; ++r) {
+    int in = r & 1, out = in ^ 1;
+    int n = *(volatile int*)&P.cnt[in];
+    if (n == 0) break;
+    if (n <= SMALL) {
+      // Few bidders left: block 0 finishes the phase alone, the rest of the grid exits.
+      if (blockIdx.x != 0) return;
+      for (;; ++r) {
+        in = r & 1, out = in ^ 1;
+        n = *(volatile int*)&P.cnt[in];
+        if (n == 0) break;
+        if (threadIdx.x == 0) {
+          P.cnt[out] = 0;  // last read a round ago; cleared before anyone can award
+          P.stats[1] += n;
+        }
+        round(P, in, out, n, threadIdx.x, blockDim.x, eps, [&] { blk.sync(); });
+        ++rounds;
+      }
+      break;
+    }
+    if (lead) {
+      P.cnt[out] = 0;
+      P.stats[1] += n;
+    }
+    round(P, in, out, n, tid, nthreads, eps, [&] { g.sync(); });
+    ++rounds;
+  }
+  if (lead) {
+    P.stats[0] += rounds;
+    P.stats[2 + phase] = rounds;
+  }
+}
+
+// Duality gap of the current assignment: sum over persons of (best value - own value).
+__global__ void gap_kernel(Params P, unsigned long long* gap) {
+  unsigned long long local = 0;
+  for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < P.N; i += gridDim.x * blockDim.x) {
+    long long v1, v2, cur = NEG;
+    int j1;
+    top2(P, i, v1, v2, j1);
+    int a = P.assign[i];
+    for (int e = P.off[i]; e < P.off[i + 1]; ++e)
+      if (P.obj[e] == a) cur = P.ben[e] - P.price[a];
+    local += (unsigned long long)(v1 - cur);
+  }
+  atomicAdd(gap, local);
 }
 
 template <class T>
@@ -157,11 +246,23 @@ T* alloc(size_t n) {
   return p;
 }
 
+struct Buffers {
+  std::vector<void*> ptrs;
+  template <class T>
+  T* keep(T* p) {
+    ptrs.push_back((void*)p);
+    return p;
+  }
+  ~Buffers() {
+    for (void* p : ptrs) cudaFree(p);
+  }
+};
+
 }  // namespace
 
 std::vector<int32_t> auction_solve(int n_rows, int n_cols, const int32_t* rows, const int32_t* cols,
                                    const int64_t* cost_ms, int64_t n_edges, int64_t unmatched_ms, int theta,
-                                   int check_every, AuctionStats* st) {
+                                   AuctionStats* st) {
   AuctionStats s{};
   std::vector<int32_t> match(n_rows, -1);
   if (n_rows == 0) {
@@ -173,24 +274,22 @@ std::vector<int32_t> auction_solve(int n_rows, int n_cols, const int32_t* rows, 
   const long long K = (long long)N + 1;
 
   // Build the square problem's CSR on the host (edges are already deduplicated).
-  std::vector<int> deg(N, 0);
-  for (int64_t e = 0; e < n_edges; ++e) {
-    deg[rows[e]]++;
-    deg[n + cols[e]]++;
-  }
   std::vector<int> off(N + 1, 0);
-  for (int p = 0; p < N; ++p) off[p + 1] = off[p] + deg[p] + 1;  // +1: dummy or own car
+  for (int64_t e = 0; e < n_edges; ++e) {
+    off[rows[e] + 1]++;
+    off[n + cols[e] + 1]++;
+  }
+  for (int p = 0; p < N; ++p) off[p + 1] += off[p] + 1;  // +1: own dummy (rider) or own car (slack)
   std::vector<int> obj(off[N]);
   std::vector<long long> ben(off[N]);
   std::vector<int> pos(off.begin(), off.end() - 1);
-  long long cmax = unmatched_ms * K;
+  const long long cmax = unmatched_ms * K;  // largest |benefit|
   for (int64_t e = 0; e < n_edges; ++e) {
     int i = rows[e], j = cols[e];
     obj[pos[i]] = j;
     ben[pos[i]++] = -cost_ms[e] * K;
     obj[pos[n + j]] = m + i;
     ben[pos[n + j]++] = 0;
-    cmax = std::max(cmax, (long long)cost_ms[e] * K);
   }
   for (int i = 0; i < n; ++i) {
     obj[pos[i]] = m + i;
@@ -201,64 +300,67 @@ std::vector<int32_t> auction_solve(int n_rows, int n_cols, const int32_t* rows, 
     ben[pos[n + j]++] = 0;
   }
 
-  Dev d;
-  d.off = upload(off);
-  d.obj = upload(obj);
-  d.ben = upload(ben);
-  d.price = alloc<long long>(N);
-  CK(cudaMemset(d.price, 0, N * sizeof(long long)));
-  d.owner = alloc<int>(N);
-  d.assign = alloc<int>(N);
-  d.bid_val = alloc<long long>(N);
-  d.bid_obj = alloc<int>(N);
-  d.obj_best = alloc<long long>(N);
-  d.obj_win = alloc<int>(N);
-  d.wl = alloc<int>(2 * (size_t)N);
-  d.cnt = alloc<int>(2);
+  Buffers b;
+  Params P{};
+  P.N = N;
+  P.off = b.keep(upload(off));
+  P.obj = b.keep(upload(obj));
+  P.ben = b.keep(upload(ben));
+  P.lone_incr = cmax;
+  P.price = b.keep(alloc<long long>(N));
+  P.owner = b.keep(alloc<int>(N));
+  P.assign = b.keep(alloc<int>(N));
+  P.bid_val = b.keep(alloc<long long>(N));
+  P.bid_obj = b.keep(alloc<int>(N));
+  P.obj_best = b.keep(alloc<long long>(N));
+  P.obj_win = b.keep(alloc<int>(N));
+  P.wl = b.keep(alloc<int>(2 * (size_t)N));
+  P.cnt = b.keep(alloc<int>(2));
+  P.stats = b.keep(alloc<long long>(2 + MAX_PHASES));
+  CK(cudaMemset(P.stats, 0, (2 + MAX_PHASES) * sizeof(long long)));
+
+  // A cooperative launch needs every block resident at once.
+  int dev, sms, per_sm;
+  CK(cudaGetDevice(&dev));
+  CK(cudaDeviceGetAttribute(&sms, cudaDevAttrMultiProcessorCount, dev));
+  CK(cudaOccupancyMaxActiveBlocksPerMultiprocessor(&per_sm, phase_kernel, THREADS, 0));
+  const int blocks = std::max(1, std::min(sms * per_sm, (N + THREADS - 1) / THREADS));
   CK(cudaDeviceSynchronize());
   s.setup_s = now() - t0;
 
-  int dev, sms;
-  CK(cudaGetDevice(&dev));
-  CK(cudaDeviceGetAttribute(&sms, cudaDevAttrMultiProcessorCount, dev));
-  const int threads = 256;
-  const int blocks = std::max(1, std::min((N + threads - 1) / threads, sms * 8));
-
   double t1 = now();
   long long eps = std::max(1LL, cmax / theta);
-  int h_cnt = 0;
-  while (true) {
-    init_phase<<<blocks, threads>>>(N, d.owner, d.assign, d.wl, d.cnt, d.obj_best, d.obj_win);
-    for (long long r = 0;; ++r) {
-      int in = r & 1, out = in ^ 1;
-      int* wl_in = d.wl + (size_t)in * N;
-      int* wl_out = d.wl + (size_t)out * N;
-      bid<<<blocks, threads>>>(wl_in, d.cnt + in, d.cnt + out, d.off, d.obj, d.ben, d.price, d.bid_val, d.bid_obj,
-                               d.obj_best, eps, cmax);
-      resolve<<<blocks, threads>>>(wl_in, d.cnt + in, d.bid_val, d.bid_obj, d.obj_best, d.obj_win);
-      award<<<blocks, threads>>>(wl_in, d.cnt + in, wl_out, d.cnt + out, d.bid_val, d.bid_obj, d.obj_best, d.obj_win,
-                                 d.price, d.owner, d.assign);
-      s.rounds++;
-      // Reading the worklist length forces a host sync, so only check every few rounds;
-      // rounds on an empty worklist do nothing.
-      if ((r + 1) % check_every == 0) {
-        CK(cudaMemcpy(&h_cnt, d.cnt + out, sizeof(int), cudaMemcpyDeviceToHost));
-        if (h_cnt == 0) break;
-      }
-    }
+  unsigned long long* d_gap = b.keep(alloc<unsigned long long>(1));
+  for (int phase = 0; phase < MAX_PHASES; ++phase) {
+    void* args[] = {&P, &phase, &eps};
+    CK(cudaLaunchCooperativeKernel((void*)phase_kernel, blocks, THREADS, args, 0, 0));
     s.phases++;
     if (eps == 1) break;
+    unsigned long long gap = 0;
+    CK(cudaMemsetAsync(d_gap, 0, sizeof(gap)));
+    gap_kernel<<<blocks, THREADS>>>(P, d_gap);
+    CK(cudaMemcpy(&gap, d_gap, sizeof(gap), cudaMemcpyDeviceToHost));
+    s.gap_stops = 0;
+    if (gap < (unsigned long long)K) {
+      s.gap_stops = 1;  // certified optimal before eps reached 1
+      break;
+    }
     eps = std::max(1LL, eps / theta);
   }
-  CK(cudaGetLastError());
   CK(cudaDeviceSynchronize());
   s.solve_s = now() - t1;
 
   double t2 = now();
   std::vector<int> assign(n);
-  CK(cudaMemcpy(assign.data(), d.assign, n * sizeof(int), cudaMemcpyDeviceToHost));
-  for (int i = 0; i < n; ++i) match[i] = assign[i] < m ? assign[i] : -1;
+  CK(cudaMemcpy(assign.data(), P.assign, n * sizeof(int), cudaMemcpyDeviceToHost));
+  std::vector<long long> stats(2 + MAX_PHASES);
+  CK(cudaMemcpy(stats.data(), P.stats, stats.size() * sizeof(long long), cudaMemcpyDeviceToHost));
+  for (int i = 0; i < n; ++i) match[i] = assign[i] >= 0 && assign[i] < m ? assign[i] : -1;
   s.copy_back_s = now() - t2;
+  s.rounds = stats[0];
+  s.bids = stats[1];
+  s.phase_rounds.assign(stats.begin() + 2, stats.begin() + 2 + s.phases);
+  s.blocks = blocks;
   if (st) *st = s;
   return match;
 }
