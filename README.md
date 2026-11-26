@@ -53,6 +53,16 @@ Geography keeps augmenting paths short, so the Go solver scales ~n^1.1. CUDA com
 
 ![E4](bench/e4/e4.png)
 
+### Delivery routes (E7): does the optimizer drive like real Amazon drivers?
+3,052 held-out real routes from the [Amazon Last Mile Routing Challenge](https://registry.opendata.aws/amazon-last-mile-challenges/), scored with the challenge's official scorer (0 = the driver's exact stop order).
+
+| Method (OR-Tools, 1 s per route) | Score (lower = closer) | Tour time vs driver |
+| --- | --- | --- |
+| Shortest tour | 0.0877 | 0.904 |
+| Shortest tour + penalty for leaving a zone | **0.0547 (−37.6%)**, better on 86% of routes | 0.940 |
+
+The penalty was tuned on 200 training routes and the held-out set was run once. A variant that guessed zone adjacency from zone ids lost. → [`routing/`](routing/README.md), [notes](docs/learning/11-last-mile-routing.md)
+
 ### Simulator validity
 | Check | Result |
 | --- | --- |
@@ -108,6 +118,7 @@ Requires Go, Docker, [uv](https://docs.astral.sh/uv/), Node.
 | `core/` | Go: world, dispatch, state (Redis + in-memory), offline simulator, fleetd, worldsim, load generator |
 | `sim/` | Python: data download, cleaning, travel-model calibration |
 | `ml/` | ETA model: OSRM, LightGBM, PyTorch, ONNX, TensorRT script |
+| `routing/` | Python: E7 last-mile stop sequencing (OR-Tools) on Amazon routes |
 | `bench/` | Every experiment's script and results |
 | `web/` | Next.js + deck.gl dashboard |
 | `docs/` | [Scope](docs/PROJECT_SCOPE.md) · [Decisions](docs/DECISIONS.md) · [Progress](docs/PROGRESS.md) · [Phase 1 checklist](docs/PHASE1_CHECKLIST.md) · [Learning notes](docs/learning/) |

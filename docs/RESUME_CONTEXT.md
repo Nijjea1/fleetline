@@ -1,4 +1,4 @@
-# Fleetline: resume context (as of 2026-11-25)
+# Fleetline: resume context (as of 2026-11-26)
 
 Source of truth for resume bullets. Every number links back to a script and result file in this repo.
 **Rule: only items under "Built" may go on a resume.** Move items up from "Planned" only after they run and have a result file.
@@ -17,6 +17,7 @@ Source of truth for resume bullets. Every number links back to a script and resu
 **Optimization / algorithms**
 - Cut average rider wait **18.6%** (median −18.4%, p90 −15.7%) vs greedy dispatch with a batched min-cost assignment solver, measured on a held-out day of **603k real trips** (3 seeds). Found and fixed rider starvation with an age-weighted objective. The gain holds (−16.9%) when a fitted model has drivers decline a quarter of offers. (bench/e2, bench/offers)
 - Wrote an exact sparse assignment solver in Go that exploits city geography (near-linear scaling): **168 ms for 100k riders, 28× faster than Google OR-Tools and 217× faster than SciPy**, all verified to the same optimum. (bench/e4)
+- Modeled real Amazon delivery-driver behavior on 3,052 held-out routes: an OR-Tools route optimizer with a tuned zone-change penalty came **37.6% closer to drivers' actual stop order** than the shortest tour (official challenge scorer, better on 86% of routes) while keeping tours 6% shorter. (routing/, bench/e7)
 
 **ML**
 - Trained a LightGBM arrival-time model that cuts error **54% vs OSRM routing** (MAE 515.7 → 236.5 s on 4.1M trips). Also benchmarked a PyTorch residual MLP (DeepETA-style, 266.1 s) and kept the better model. (ml/)
@@ -43,3 +44,4 @@ Go, Kafka/Redpanda, Redis (Lua scripting), Docker Compose, Python, NumPy/SciPy, 
 - The PyTorch MLP **lost** to LightGBM. Say "benchmarked" or "compared", never "deployed a deep learning ETA model".
 - The "Apple GPU" result is the M5 MacBook's GPU, not CUDA.
 - If asked about the timeline: development started 2026-11-20 (the git history shows this).
+- E7 scores are not comparable to the 2021 Amazon challenge leaderboard (that used a hidden final set). Say "official scorer, held-out routes", never "beat the leaderboard". "6% shorter" uses the challenge's travel-time matrix, which knows nothing about parking or access.

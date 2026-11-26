@@ -10,7 +10,7 @@ uv run fleetline-routing eval      # 3,052 held-out routes, once
 ```
 
 - **Score:** the challenge's official scorer (downloaded at run time, unmodified). Lower is better; 0 = the driver's exact order. Note: it also scores an exactly reversed order 0.
-- **Methods:** `shortest` (fastest tour, OR-Tools) and `zones` (fastest tour after penalizing edges that leave a delivery zone, graded by zone-id distance).
+- **Methods:** `shortest` (fastest tour, OR-Tools guided local search) and `zones_*` (fastest tour after a penalty on edges that leave a delivery zone; flat, or graded by zone-id distance).
 - **Protocol:** penalties tuned on training routes only; the evaluation set is run once.
 
-Results: `bench/e7/results/`.
+**Result (held out):** shortest 0.0877 → flat 3,000 s zone penalty **0.0547 (−37.6%)**, better on 2,639 of 3,052 routes, tours 6% shorter than the drivers'. Graded penalties lost in tuning. Files: `bench/e7/results/`; write-up: `docs/learning/11-last-mile-routing.md`.

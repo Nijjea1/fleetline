@@ -24,7 +24,7 @@ Steps for the GPU machine: [`GPU_MACHINE.md`](GPU_MACHINE.md).
 | 3.2 | E6 on Mac: ONNX Runtime CPU vs Apple GPU | Mac | ✅ |
 | 3.3 | E6 on NVIDIA: TensorRT FP32 / FP16 / INT8 (script ready in `ml/tensorrt`) | GPU | ⬜ needs you |
 | 3.4 | E5b: dispatch with the learned ETA instead of straight-line: does it cut waits? | Mac | ⬜ |
-| 3.5 | E7: Amazon Last Mile routes, stop-order match vs real drivers | Mac (multi-GB download) | ⬜ |
+| 3.5 | E7: Amazon Last Mile routes, stop-order match vs real drivers | Mac | ✅ score −37.6% vs shortest tour (held out) |
 | 3.6 | AWS deploy with Terraform (EKS/MSK or a cheaper ECS variant), GitHub Actions deploy | You (AWS account, budget) | ⬜ decide budget |
 
 ## Phase 4 · Ship
