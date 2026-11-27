@@ -49,6 +49,10 @@ constexpr int THREADS = 256;
 constexpr int SMALL = THREADS * 4;  // worklist size at which block 0 takes over
 constexpr int MAX_PHASES = 64;
 constexpr long long NEG = LLONG_MIN / 4;
+// Extra stats after the per-phase rounds: rounds and SM clock cycles (block 0's clock) spent
+// with the whole grid bidding vs. block 0 alone finishing the tail.
+constexpr int STAT_GRID_ROUNDS = 2 + MAX_PHASES, STAT_TAIL_ROUNDS = STAT_GRID_ROUNDS + 1,
+              STAT_GRID_CYCLES = STAT_GRID_ROUNDS + 2, STAT_TAIL_CYCLES = STAT_GRID_ROUNDS + 3, N_STATS = STAT_GRID_ROUNDS + 4;
 
 #define CK(x)                                                                              \
   do {                                                                                     \
@@ -76,7 +80,7 @@ struct Params {
   int* obj_win;          // per object: lowest person id among the highest bidders
   int* wl;               // two worklists of N persons
   int* cnt;              // [0..1] worklist lengths
-  long long* stats;      // [0] rounds, [1] bids, [2 + phase] rounds in that phase
+  long long* stats;      // [0] rounds, [1] bids, [2 + phase] rounds in that phase, then STAT_* below
 };
 
 // Best and second-best value (benefit - price) over a person's options.
@@ -182,7 +186,8 @@ __global__ void phase_kernel(Params P, int phase, long long eps) {
     if (P.assign[i] < 0) push(P, 0, i);
   g.sync();
 
-  long long rounds = 0;
+  long long rounds = 0, tail_rounds = 0;
+  long long t_start = clock64(), t_tail = 0;
   for (int r = 0;; ++r) {
     int in = r & 1, out = in ^ 1;
     int n = *(volatile int*)&P.cnt[in];
@@ -190,6 +195,7 @@ __global__ void phase_kernel(Params P, int phase, long long eps) {
     if (n <= SMALL) {
       // Few bidders left: block 0 finishes the phase alone, the rest of the grid exits.
       if (blockIdx.x != 0) return;
+      t_tail = clock64();
       for (;; ++r) {
         in = r & 1, out = in ^ 1;
         n = *(volatile int*)&P.cnt[in];
@@ -200,6 +206,7 @@ __global__ void phase_kernel(Params P, int phase, long long eps) {
         }
         round(P, in, out, n, threadIdx.x, blockDim.x, eps, [&] { blk.sync(); });
         ++rounds;
+        ++tail_rounds;
       }
       break;
     }
@@ -211,8 +218,14 @@ __global__ void phase_kernel(Params P, int phase, long long eps) {
     ++rounds;
   }
   if (lead) {
+    long long t_end = clock64();
+    if (!t_tail) t_tail = t_end;
     P.stats[0] += rounds;
     P.stats[2 + phase] = rounds;
+    P.stats[STAT_GRID_ROUNDS] += rounds - tail_rounds;
+    P.stats[STAT_TAIL_ROUNDS] += tail_rounds;
+    P.stats[STAT_GRID_CYCLES] += t_tail - t_start;
+    P.stats[STAT_TAIL_CYCLES] += t_end - t_tail;
   }
 }
 
@@ -316,8 +329,8 @@ std::vector<int32_t> auction_solve(int n_rows, int n_cols, const int32_t* rows, 
   P.obj_win = b.keep(alloc<int>(N));
   P.wl = b.keep(alloc<int>(2 * (size_t)N));
   P.cnt = b.keep(alloc<int>(2));
-  P.stats = b.keep(alloc<long long>(2 + MAX_PHASES));
-  CK(cudaMemset(P.stats, 0, (2 + MAX_PHASES) * sizeof(long long)));
+  P.stats = b.keep(alloc<long long>(N_STATS));
+  CK(cudaMemset(P.stats, 0, N_STATS * sizeof(long long)));
 
   // A cooperative launch needs every block resident at once.
   int dev, sms, per_sm;
@@ -353,7 +366,7 @@ std::vector<int32_t> auction_solve(int n_rows, int n_cols, const int32_t* rows, 
   double t2 = now();
   std::vector<int> assign(n);
   CK(cudaMemcpy(assign.data(), P.assign, n * sizeof(int), cudaMemcpyDeviceToHost));
-  std::vector<long long> stats(2 + MAX_PHASES);
+  std::vector<long long> stats(N_STATS);
   CK(cudaMemcpy(stats.data(), P.stats, stats.size() * sizeof(long long), cudaMemcpyDeviceToHost));
   for (int i = 0; i < n; ++i) match[i] = assign[i] >= 0 && assign[i] < m ? assign[i] : -1;
   s.copy_back_s = now() - t2;
@@ -361,6 +374,10 @@ std::vector<int32_t> auction_solve(int n_rows, int n_cols, const int32_t* rows, 
   s.bids = stats[1];
   s.phase_rounds.assign(stats.begin() + 2, stats.begin() + 2 + s.phases);
   s.blocks = blocks;
+  s.grid_rounds = stats[STAT_GRID_ROUNDS];
+  s.tail_rounds = stats[STAT_TAIL_ROUNDS];
+  s.grid_cycles = stats[STAT_GRID_CYCLES];
+  s.tail_cycles = stats[STAT_TAIL_CYCLES];
   if (st) *st = s;
   return match;
 }

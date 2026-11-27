@@ -33,6 +33,10 @@ static py::tuple solve(int n_rows, int n_cols, I32 rows, I32 cols, I64 cost_ms, 
   stats["phase_rounds"] = st.phase_rounds;
   stats["blocks"] = st.blocks;
   stats["gap_stop"] = st.gap_stops;
+  stats["grid_rounds"] = st.grid_rounds;
+  stats["tail_rounds"] = st.tail_rounds;
+  stats["grid_cycles"] = st.grid_cycles;
+  stats["tail_cycles"] = st.tail_cycles;
   return py::make_tuple(out, stats);
 }
 
