@@ -1,0 +1,14 @@
+# 2026-11-27 Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39
+n       method       setting              wall_s  status  fractional  rounded_gap  status=1 means optimal
+1000    PDLP         default tolerances     2.346       1        6976  +787930529.766
+1000    PDLP         tight tolerances       1.040       1           0       +0.000
+1000    PDLP         crossover              0.943       1           0       +0.000
+1000    Barrier      default                0.949       1        6964       +0.000
+1000    Barrier      crossover              0.811       1        6964       +0.000
+1000    DualSimplex  default                0.071       1           0       +0.000
+10000   PDLP         default tolerances     1.403       1       71015  +8054751495.730
+10000   PDLP         tight tolerances       1.747       1           4       +0.000
+10000   PDLP         crossover              3.561       1           0       +0.000
+10000   Barrier      default                0.889       1       71299  +6999813.472
+10000   Barrier      crossover             52.313       1       71299  +6999813.472
+10000   DualSimplex  default                1.649       1           0       +0.000

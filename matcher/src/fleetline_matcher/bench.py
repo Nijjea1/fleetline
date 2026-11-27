@@ -19,7 +19,7 @@ from pathlib import Path
 import numpy as np
 
 from .instances import REPO, Instance, build, objective
-from .solvers import CUDA_STATS, ROUNDED, SOLVERS
+from .solvers import APPROX, CUDA_STATS, CUOPT_STATS, ROUNDED, SOLVERS
 
 GO_BIN = REPO / "core/bin/assignbench"
 OUT = REPO / "bench/e4"
@@ -36,12 +36,13 @@ def run_go(inst: Instance, reps: int, tmp: Path):
     return np.fromfile(m, "<i4").astype(int), t["setup_s"], t["solve_s"]
 
 
-def time_py(fn, inst: Instance, reps: int):
+def time_py(name: str, fn, inst: Instance, reps: int):
     best = None
     for _ in range(reps):
         match, setup, solve = fn(inst)
         if best is None or solve < best[2]:
-            best = (match, setup, solve, dict(CUDA_STATS) if fn is SOLVERS.get("cuda_auction") else {})
+            stats = CUDA_STATS if fn is SOLVERS.get("cuda_auction") else CUOPT_STATS if name.startswith("cuopt") else {}
+            best = (match, setup, solve, dict(stats))
     return best
 
 
@@ -72,6 +73,7 @@ def main():
     ap.add_argument("--sizes", default="100,300,1000,3000,10000,30000,100000")
     ap.add_argument("--seeds", type=int, default=3)
     ap.add_argument("--machine", default=f"cpu_{platform.machine()}_{platform.system().lower()}")
+    ap.add_argument("--solvers", default="", help="comma list to run (go_ssp always runs); default: all")
     args = ap.parse_args()
     if not GO_BIN.exists():
         raise SystemExit("build it first: cd core && go build -o bin/assignbench ./cmd/assignbench")
@@ -84,15 +86,20 @@ def main():
                 inst = build(n, seed=seed)
                 results = {"go_ssp": run_go(inst, reps, Path(tmp))}
                 for name, fn in SOLVERS.items():
+                    if args.solvers and name not in args.solvers.split(","):
+                        continue
                     if name == "scipy_dense" and n > DENSE_MAX:
                         continue
-                    results[name] = time_py(fn, inst, reps)
+                    results[name] = time_py(name, fn, inst, reps)
                 objs = {name: objective(inst, r[0]) for name, r in results.items()}
                 ref = objs["go_ssp"]
                 # OR-Tools and the GPU auction round costs to whole milliseconds: allow 1 ms per row.
+                gaps = {}
                 for name, v in objs.items():
                     tol = 1e-3 * n if name in ROUNDED else 1e-6 * max(1.0, abs(ref))
-                    if abs(v - ref) > tol:
+                    if name in APPROX:
+                        gaps[name] = v - ref  # recorded, and reported as not optimal if > tol
+                    elif abs(v - ref) > tol:
                         raise SystemExit(f"n={n} seed={seed}: {name} total {v} != go_ssp {ref}")
                 matched = int((results["go_ssp"][0] >= 0).sum())
                 for name, (_, setup, solve, *extra) in results.items():
@@ -107,6 +114,9 @@ def main():
                     }
                     if extra and extra[0]:  # GPU: phases, rounds, and how setup splits
                         row["gpu"] = extra[0]
+                    if name in gaps:
+                        row["gap_vs_go"] = gaps[name]
+                        row["optimal"] = abs(gaps[name]) <= 1e-6 * max(1.0, abs(ref))
                     rows.append(row)
                 line = "  ".join(f"{k} {v[2] * 1e3:9.2f} ms" for k, v in results.items())
                 print(f"n={n:>6} seed={seed} edges={inst.n_edges:>7} matched={matched:>6}  {line}", flush=True)
@@ -137,6 +147,9 @@ def plot():
         "scipy_dense": "#f0a35e",
         "ortools_flow": "#c084fc",
         "cuda_auction": "#e5484d",
+        "cuopt_pdlp": "#76b900",
+        "cuopt_pdlp_crossover": "#4d7a00",
+        "cuopt_dual_simplex": "#a3a3a3",
     }
     styles = ["o-", "s--", "^:"]
     files = sorted(OUT.joinpath("results").glob("*.json"), key=lambda p: (not p.stem.startswith("cpu"), p.stem))
@@ -144,20 +157,27 @@ def plot():
     for style, f in zip(styles, files):
         rows = json.loads(f.read_text())["rows"]
         for solver, color in colors.items():
-            pts = {}
+            if solver == "go_ssp" and "cuopt" in f.stem:  # same machine's Go line is already drawn
+                continue
+            pts, wrong = {}, set()
             for r in rows:
                 if r["solver"] == solver:
                     pts.setdefault(r["n"], []).append(r["solve_s"] * 1e3)
+                    if r.get("optimal") is False:
+                        wrong.add(r["n"])
             if pts:
                 ns = sorted(pts)
                 med = [float(np.median(pts[n])) for n in ns]
                 ax.plot(ns, med, style, color=color, label=f"{solver} · {f.stem}", ms=4)
+                bad = [(n, m) for n, m in zip(ns, med) if n in wrong]
+                if bad:  # answer not optimal on at least one seed (cuOpt, D-019)
+                    ax.plot(*zip(*bad), "x", color="black", ms=9, mew=2)
     ax.set(
         xscale="log",
         yscale="log",
         xlabel="riders in one batch (cars = 2x, 8 nearest each)",
         ylabel="solve time, ms (median of seeds)",
-        title="E4 · assignment solve time vs batch size",
+        title="E4 · assignment solve time vs batch size  (× = not optimal on ≥ 1 seed)",
     )
     ax.grid(alpha=0.3, which="both")
     ax.legend(frameon=False, fontsize=7, ncol=2)

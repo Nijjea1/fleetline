@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from fleetline_matcher.instances import DAY, Instance, build, objective
-from fleetline_matcher.solvers import ROUNDED, SOLVERS
+from fleetline_matcher.solvers import APPROX, ROUNDED, SOLVERS
 
 
 def tiny():
@@ -27,7 +27,7 @@ def synthetic_city(seed):
 @pytest.mark.parametrize("seed", range(3))
 def test_solvers_agree(seed):
     inst = build(400, seed=seed, points=synthetic_city(seed))
-    totals = {name: objective(inst, fn(inst)[0]) for name, fn in SOLVERS.items()}
+    totals = {name: objective(inst, fn(inst)[0]) for name, fn in SOLVERS.items() if name not in APPROX}
     ref = totals["scipy_dense"]
     for name, v in totals.items():
         assert abs(v - ref) <= (0.4 if name in ROUNDED else 1e-6), (name, v, ref)
@@ -37,7 +37,7 @@ def test_solvers_agree(seed):
 @pytest.mark.parametrize("seed", range(2))
 def test_solvers_agree_on_real_geography(seed):
     inst = build(400, seed=seed)
-    totals = {name: objective(inst, fn(inst)[0]) for name, fn in SOLVERS.items()}
+    totals = {name: objective(inst, fn(inst)[0]) for name, fn in SOLVERS.items() if name not in APPROX}
     ref = totals["scipy_dense"]
     for name, v in totals.items():
         assert abs(v - ref) <= (0.4 if name in ROUNDED else 1e-6), (name, v, ref)

@@ -6,6 +6,8 @@ reported separately as setup, because a production system would keep data in tha
 format already.
 
 cuda_auction (the GPU solver, matcher/cuda) is only present when it has been built there.
+The cuopt_* solvers (NVIDIA cuOpt's LP solvers) only appear where cuOpt is installed: it
+needs Python <= 3.13 and an NVIDIA GPU, so it runs from a separate venv (matcher/README).
 """
 
 import time
@@ -123,8 +125,89 @@ def cuda_auction(inst: Instance):
     return match.astype(np.int64), (t1 - t0) + st["setup_s"] + st["copy_back_s"], st["solve_s"]
 
 
+try:
+    from cuopt.linear_programming import DataModel, Solve, SolverMethod, SolverSettings
+except ImportError:  # not installed (Python 3.14 project venv, the Mac, CI)
+    Solve = None
+
+CUOPT_STATS: dict = {}  # termination status, cuOpt's own solve time, fractional edges
+_TIGHT = 1e-10  # PDLP's default tolerances (~1e-4 relative) stop far from a vertex; see D-019
+
+
+def _cuopt_lp(inst: Instance, method: str, extra: dict):
+    """The assignment as an LP: a variable x_e in [0, 1] per (rider, car) edge plus u_i per
+    rider (unmatched, cost UNMATCHED). Rider rows: sum x + u = 1. Car rows: sum x <= 1. The
+    constraint matrix is totally unimodular, so every *vertex* optimum is 0/1 and equals the
+    assignment optimum. Rows are matched where x_e > 0.5; the bench checks the total
+    against Go, because an interior (non-vertex) LP solution can round to a worse one."""
+    t0 = time.perf_counter()
+    rows, cols, costs = _dedupe(inst)
+    n, m, e = inst.n_rows, inst.n_cols, len(rows)
+    r = np.concatenate([rows, np.arange(n), n + cols])
+    c = np.concatenate([np.arange(e), e + np.arange(n), np.arange(e)])
+    a = csr_matrix((np.ones(len(r)), (r, c)), shape=(n + m, e + n))
+    dm = DataModel()
+    dm.set_csr_constraint_matrix(a.data, a.indices.astype(np.int32), a.indptr.astype(np.int32))
+    dm.set_constraint_lower_bounds(np.concatenate([np.ones(n), np.full(m, -np.inf)]))
+    dm.set_constraint_upper_bounds(np.ones(n + m))
+    dm.set_objective_coefficients(np.concatenate([costs, np.full(n, UNMATCHED)]))
+    dm.set_variable_lower_bounds(np.zeros(e + n))
+    dm.set_variable_upper_bounds(np.ones(e + n))
+    st = SolverSettings()
+    st.set_parameter("method", getattr(SolverMethod, method))
+    st.set_parameter("log_to_console", False)
+    st.set_parameter("time_limit", 600)
+    for k, v in extra.items():
+        st.set_parameter(k, v)
+    t1 = time.perf_counter()
+    sol = Solve(dm, st)
+    t2 = time.perf_counter()
+    x = np.asarray(sol.get_primal_solution())[:e]
+    # Round: take edges with x > 0.5, largest first, at most one per rider and per car. A
+    # vertex solution is already 0/1; an interior one is only feasible to a tolerance, so two
+    # edges into one car can both sit just above 0.5 (seen at 30k riders).
+    match = np.full(n, -1)
+    taken = np.zeros(m, bool)
+    for i in np.flatnonzero(x > 0.5)[np.argsort(-x[x > 0.5], kind="stable")]:
+        if match[rows[i]] < 0 and not taken[cols[i]]:
+            match[rows[i]], taken[cols[i]] = cols[i], True
+    CUOPT_STATS.clear()
+    CUOPT_STATS.update(
+        status=int(sol.get_termination_status()),
+        cuopt_solve_s=float(sol.get_solve_time()),
+        fractional=int(((x > 1e-6) & (x < 1 - 1e-6)).sum()),
+    )
+    return match, t1 - t0, t2 - t1
+
+
+def cuopt_pdlp(inst: Instance):
+    """cuOpt PDLP (first-order LP method, on the GPU) at tight tolerances, rounded."""
+    tol = {f"{a}_{b}_tolerance": _TIGHT for a in ("relative", "absolute") for b in ("gap", "primal", "dual")}
+    return _cuopt_lp(inst, "PDLP", tol)
+
+
+def cuopt_pdlp_crossover(inst: Instance):
+    """cuOpt PDLP followed by crossover to a vertex: exact by construction."""
+    return _cuopt_lp(inst, "PDLP", {"crossover": True})
+
+
+def cuopt_dual_simplex(inst: Instance):
+    """cuOpt's dual simplex (runs on the CPU): exact vertex solution."""
+    return _cuopt_lp(inst, "DualSimplex", {})
+
+
 SOLVERS = {"scipy_dense": scipy_dense, "scipy_sparse": scipy_sparse, "ortools_flow": ortools_flow}
 if _cuda_auction is not None:
     SOLVERS["cuda_auction"] = cuda_auction
+if Solve is not None:
+    SOLVERS |= {
+        "cuopt_pdlp": cuopt_pdlp,
+        "cuopt_pdlp_crossover": cuopt_pdlp_crossover,
+        "cuopt_dual_simplex": cuopt_dual_simplex,
+    }
+# Checked against Go but not trusted to be exact: the bench records the gap instead of
+# stopping. PDLP is approximate by design; crossover and dual simplex should return a vertex
+# (exact here), but PDLP + crossover returned a non-optimal total at 100k riders (D-019).
+APPROX = {"cuopt_pdlp", "cuopt_pdlp_crossover", "cuopt_dual_simplex"}
 # Solvers that work on millisecond-rounded costs: their totals may differ by up to 1 ms per row.
 ROUNDED = {"ortools_flow", "cuda_auction"}
