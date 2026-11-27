@@ -1,0 +1,91 @@
+# ncu: one mid-run phase_kernel launch (skip 8), n=30000 seed=0
+==PROF== Connected to process 748 (/home/avneet/.local/share/uv/python/cpython-3.14.10-linux-x86_64-gnu/bin/python3.14)
+==PROF== Profiling "phase_kernel": 0%....50%....100% - 9 passes
+n=30000 seed=0 setup 107.8 ms solve 18581.3 ms {'setup_s': 0.017266990000010196, 'solve_s': 18.581261862999995, 'copy_back_s': 0.00038515699999663866, 'phases': 15, 'rounds': 6018089, 'bids': 28350068, 'blocks': 130, 'gap_stop': 1, 'grid_rounds': 1654, 'tail_rounds': 6016435, 'grid_cycles': 59419645, 'tail_cycles': 34185489575}
+==PROF== Disconnected from process 748
+[748] python3.14@127.0.0.1
+  <unnamed>::phase_kernel(<unnamed>::Params, int, long long) (130, 1, 1)x(256, 1, 1), Context 1, Stream 7, Device 0, CC 12.0
+    Section: GPU Speed Of Light Throughput
+    ----------------------- ----------- ------------
+    Metric Name             Metric Unit Metric Value
+    ----------------------- ----------- ------------
+    DRAM Frequency                  Ghz        11.96
+    SM Frequency                    Ghz         1.41
+    Elapsed Cycles                cycle    694042566
+    Memory Throughput                 %         0.36
+    DRAM Throughput                   %         0.02
+    Duration                         ms       491.02
+    L1/TEX Cache Throughput           %         5.18
+    L2 Cache Throughput               %         0.36
+    SM Active Cycles              cycle  30135338.04
+    Compute (SM) Throughput           %         0.17
+    ----------------------- ----------- ------------
+
+    OPT   This workload exhibits low compute throughput and memory bandwidth utilization relative to the peak           
+          performance of this device. Achieved compute throughput and/or memory bandwidth below 60.0% of peak           
+          typically indicate latency issues. Look at Scheduler Statistics and Warp State Statistics for potential       
+          reasons.                                                                                                      
+
+    Section: Memory Workload Analysis
+    -------------------- ----------- ------------
+    Metric Name          Metric Unit Metric Value
+    -------------------- ----------- ------------
+    Memory Throughput        Mbyte/s        71.06
+    Mem Busy                       %         0.36
+    Max Bandwidth                  %         0.35
+    L1/TEX Hit Rate                %        39.81
+    L2 Compression Ratio                        0
+    L2 Hit Rate                    %        91.26
+    Mem Pipes Busy                 %         0.17
+    -------------------- ----------- ------------
+
+    Section: Launch Statistics
+    -------------------------------- --------------- ---------------
+    Metric Name                          Metric Unit    Metric Value
+    -------------------------------- --------------- ---------------
+    Block Size                                                   256
+    Cluster Scheduling Policy                           PolicySpread
+    Cluster Size                                                   0
+    Function Cache Configuration                     CachePreferNone
+    Grid Size                                                    130
+    Preferred Cluster Size                                         0
+    Registers Per Thread             register/thread              48
+    Shared Memory Configuration Size           Kbyte           16.38
+    Driver Shared Memory Per Block       Kbyte/block            1.02
+    Dynamic Shared Memory Per Block       byte/block               0
+    Static Shared Memory Per Block        byte/block               0
+    # SMs                                         SM              26
+    Stack Size                                                  1024
+    Threads                                   thread           33280
+    # TPCs                                                        13
+    Enabled TPC IDs                                              all
+    Uses Green Context                                             0
+    Waves Per SM                                                   1
+    -------------------------------- --------------- ---------------
+
+    Section: Occupancy
+    ------------------------------- ----------- ------------
+    Metric Name                     Metric Unit Metric Value
+    ------------------------------- ----------- ------------
+    Max Active Clusters                 cluster            0
+    Max Cluster Size                      block            8
+    Overall GPU Occupancy                     %            0
+    Cluster Occupancy                         %            0
+    Block Limit Barriers                  block           24
+    Block Limit SM                        block           24
+    Block Limit Registers                 block            5
+    Block Limit Shared Mem                block           16
+    Block Limit Warps                     block            6
+    Theoretical Active Warps per SM        warp           40
+    Theoretical Occupancy                     %        83.33
+    Achieved Occupancy                        %        24.60
+    Achieved Active Warps Per SM           warp        11.81
+    ------------------------------- ----------- ------------
+
+    OPT   Est. Local Speedup: 70.48%                                                                                    
+          The difference between calculated theoretical (83.3%) and measured achieved occupancy (24.6%) can be the      
+          result of warp scheduling overheads or workload imbalances during the kernel execution. Load imbalances can   
+          occur between warps within a block as well as across blocks of the same kernel. See the CUDA Best Practices   
+          Guide (https://docs.nvidia.com/cuda/cuda-c-best-practices-guide/index.html#occupancy) for more details on     
+          optimizing occupancy.                                                                                         
+

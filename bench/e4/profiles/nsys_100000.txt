@@ -1,0 +1,17 @@
+# nsys: cuda_auction, n=100000 seed=0, NVIDIA GeForce RTX 5060 Laptop GPU, 591.84, NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0
+n=100000 seed=0 setup 424.8 ms solve 1046.3 ms {'setup_s': 0.05737549999999203, 'solve_s': 1.0463315580000057, 'copy_back_s': 0.000841051999998399, 'phases': 16, 'rounds': 328946, 'bids': 34669713, 'blocks': 130, 'gap_stop': 0, 'grid_rounds': 3409, 'tail_rounds': 325537, 'grid_cycles': 200158154, 'tail_cycles': 2690752549}
+
+ ** CUDA API Summary (cuda_api_sum):
+
+ Time (%)  Total Time (ns)  Num Calls   Avg (ns)   Med (ns)   Min (ns)  Max (ns)   StdDev (ns)             Name            
+ --------  ---------------  ---------  ----------  ---------  --------  ---------  -----------  ---------------------------
+     69.4       1018007200         32  31812725.0  1249625.0     22937  286202440   55358741.9  cudaMemcpy                 
+     27.4        402357841         42   9579948.6     5075.5      2385  388956807   59969058.9  cudaMalloc                 
+      1.8         26530997          6   4421832.8    30493.5      1904   26396328   10765284.7  cudaDeviceSynchronize      
+      0.7          9862092         42    234811.7     5651.5      2585    1082829     353915.8  cudaFree                   
+      0.4          6390443         18    355024.6   215898.0     33579    2603914     580118.4  cudaLaunchCooperativeKernel
+      0.1          1524260         17     89662.4    53411.0     13287     336027      82392.5  cudaMemsetAsync            
+      0.1          1443733         17     84925.5    40715.0     15613     348104     100551.6  cudaLaunchKernel           
+      0.0           609832          3    203277.3    56006.0     15913     537913     290495.5  cudaMemset                 
+      0.0             2355          1      2355.0     2355.0      2355       2355          0.0  cuModuleGetLoadingMode     
+
