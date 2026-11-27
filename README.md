@@ -53,6 +53,8 @@ Geography keeps augmenting paths short, so the Go solver scales ~n^1.1. → [`ma
 
 **GPU (RTX 5060, same-machine comparison):** a custom CUDA auction solver, exact and verified against Go on every run, **never beats the Go solver**. At 100k riders it takes 1.18 s vs Go's 649 ms on that laptop, while beating OR-Tools (18.0 s) by 15× and SciPy (50.5 s) by 43×. Below 30k riders it loses to every CPU solver (1k: 250 ms vs 1.6 ms). Nsight shows why: the work is chains of evictions handled a few bids per round, so ~1 of 26 SMs is busy ([learning note 10](docs/learning/10-gpu-auction.md)). Dashed lines in the plot are the RTX 5060 machine.
 
+**NVIDIA cuOpt** (dotted lines) has no assignment API, so it solved the assignment as a linear program. Go was **20–2,100× faster** at every size, and at 100k riders cuOpt's GPU method (PDLP) reported "optimal" while its rounded answer was not; only PDLP + crossover reached the optimum on all seeds (≈ 210 s vs Go's 0.79 s). → [`matcher/`](matcher/README.md), [D-019](docs/DECISIONS.md)
+
 ![E4](bench/e4/e4.png)
 
 ### Delivery routes (E7): does the optimizer drive like real Amazon drivers?

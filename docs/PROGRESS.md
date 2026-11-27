@@ -6,7 +6,7 @@ A running record of what was built, when, and what is next. Dates are real work 
 
 | Step | Status |
 | --- | --- |
-| 0. CUDA test kernel + PyTorch on RTX 5060 | ⬜ To do on the GPU machine |
+| 0. CUDA test kernel + PyTorch on RTX 5060 | ✅ 2026-11-26 (`bench/gpu_smoke.txt`) |
 | 1. Repo skeleton, docs, docker compose | ✅ 2026-11-20 |
 | 2. Download data, build replay day | ✅ 2026-11-20 |
 | 3. Event replayer → Kafka (`worldsim`) | ✅ 2026-11-20 |
@@ -126,3 +126,22 @@ Reference for the same 07:00–07:20 window, real Uber/Lyft: **mean 381 s, p50 2
 - **Dashboard compare view** (`?mode=compare`): two maps on one camera and one clock, greedy vs batched on the same 08:00–08:20 Sep 16 morning. `export-replay -policy batched` writes `web/public/replay-batched/`, and the greedy export is byte-identical to before. In that window the mean wait goes 4:43 → 3:23 (−28%) and p90 11:08 → 8:05. The full-day held-out figure (−18.6%) is quoted next to it. I dropped a first "avg wait of pickups so far" stat because it misled: batched picks up more long-waiting riders, so that average briefly looked worse.
 - A Turbopack "ModuleGraph … canceled" build panic came from a stale `.next` cache. `rm -rf .next` fixed it.
 - **E7 (Amazon Last Mile)**: new `routing/` project. Streams the 3 GB challenge data with ijson, scores with the official scorer (downloaded, not vendored). OR-Tools TSP + guided local search, 1 s per route. Tuned on 200 training routes: a flat 3,000 s penalty for leaving a zone beats the shortest tour (0.0932 → 0.0565); penalties graded by zone-id distance lost. Held-out 3,052 routes, run once: **0.0877 → 0.0547 (−37.6%)**, better on 2,639 routes, tours 0.940× the drivers'. Note: `docs/learning/11-last-mile-routing.md`.
+
+## 2026-11-26 – 27: the GPU machine (RTX 5060 laptop), `docs/GPU_MACHINE.md` Tasks 0–6
+Setup: WSL2 Ubuntu 24.04 on Windows 11; RTX 5060 Laptop GPU (8 GB, sm_120), driver 591.84; Ryzen AI 9 HX 370; CUDA 12.9 (minimal packages), Go 1.27.4, uv 0.13.10, TensorRT 11.5.0.63, cuOpt 26.10 (Python 3.13 venv). Timed runs on AC power, Windows "Performance" plan, Steam/Epic closed.
+- **Smoke test (checklist F)**: vecadd correct at 318 GB/s, torch 2.11.0+cu128, fp16 matmul 12.3 TFLOPS (`bench/gpu_smoke.txt`).
+- **E4 GPU (2.7/2.8)**: exact CUDA auction solver (D-018), 232 GPU tests, verified against Go on every instance. Loses to Go at every size; at 100k riders 1.18 s vs 0.65 s, but 15× OR-Tools and 43× SciPy. Nsight: ~1 of 26 SMs busy (eviction chains). Note 10.
+- **E6 TensorRT (3.3)**: TensorRT 11 is strongly typed (no `--fp16`), so FP16 is built from an FP16 ONNX copy. FP16 test MAE +0.003 s on 4.1M trips; 2.3–8.9× faster than eager PyTorch on the same GPU; 3.0× FP32 in GPU compute at batch 8,192. INT8 not done. Note 12.
+- **E4 cuOpt (2.9)**: no assignment API, so the assignment LP. Go 20–2,100× faster; PDLP reported Optimal at 100k with ~315k fractional variables; Barrier never gave an integral answer (D-019). Note 13.
+
+Surprises:
+- The first auction kernels spent ~77 µs per round on launches (fixed with cooperative kernels), and rectangular auction caused price wars (fixed with a square reformulation).
+- cuOpt's "Optimal" status was wrong for our purpose three ways: default PDLP tolerances, a car assigned twice after rounding, and a non-optimal crossover result at 100k in one run. The bench now records gaps instead of trusting status.
+- Under WSL2, a Python call to the GPU costs ~0.13 ms even when the math takes 0.03 ms.
+- Process note: a short test run (~8 s, including GPU tests) overlapped the second cuOpt bench run. That run was later discarded for an unrelated abort, and the committed file comes from a clean third run.
+- Steam/Epic restart after a reboot and must be closed again before timing. GPU performance counters (Nsight Compute) needed a Windows setting plus a reboot.
+
+### Resume bullets (every number from a committed result file)
+- Wrote an exact GPU assignment solver in CUDA (ε-scaling auction, cooperative kernels, pybind11): at 100k riders it solves in **1.18 s, 15× faster than OR-Tools and 43× faster than SciPy, but 1.8× slower than my Go solver**. Nsight Compute showed why (~1 of 26 SMs busy on eviction chains).
+- Served the ETA MLP with TensorRT 11 on an RTX 5060: FP16 keeps test accuracy (+0.003 s MAE on 4.1M trips) and runs **2.3–8.9× faster than PyTorch** on the same GPU.
+- Benchmarked NVIDIA cuOpt's LP solvers on the same instances with every answer verified: the Go solver was 20–2,100× faster, and cuOpt's GPU PDLP returned a non-optimal assignment at 100k riders while reporting "optimal".

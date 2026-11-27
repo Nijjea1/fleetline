@@ -144,3 +144,11 @@ Short architecture decision records. Each entry: what we chose, what we rejected
   - *Packing (bid, rider) into one 64-bit word for `atomicMax`*: scaled bids need ~49 bits and ids ~19, so ties go to a second pass with `atomicMin` on the id.
 - **Why:** the GPU column of E4 must be exact or it isn't comparable; the bench verifies every total against Go's SSP.
 - **Consequence:** auction does far more work than SSP here (10k riders, θ = 8: 6.4M bids over 0.87M rounds, i.e. ~640 bids per rider and ~7 bidders per round: mostly one eviction-chain step per round), so the GPU column is expected to lose to Go. That is recorded as the E4 result, with the profile.
+
+## D-019 · cuOpt in E4: the assignment as an LP, every answer checked against Go
+
+- **Date:** 2026-11-27
+- **Chose:** cuOpt has no assignment API, so E4 uses its LP solvers on the assignment LP (edge variables in [0, 1] plus an unmatched variable per rider; rider rows = 1, car rows ≤ 1). Three settings: PDLP at tolerances 10⁻¹⁰ (GPU), PDLP + crossover, dual simplex (CPU). Rows are rounded greedily (largest x first, one per rider and car) so the result is always a valid assignment, and the bench records each total's gap to Go instead of trusting cuOpt's status.
+- **Rejected:** PDLP at default tolerances (~10⁻⁴ relative: with 10⁶-per-unmatched-rider costs that is far from a vertex; rounded totals off by 10⁹–10¹⁰ at 1k–10k riders); Barrier with or without crossover (fractional at 1k and 10k; crossover took 52 s at 10k and still left 71k fractional variables). `bench/e4/cuopt_methods.txt`.
+- **Why:** the first bench run crashed at 30k riders because rounded PDLP put two riders in one car (two x values just above 0.5); the second aborted at 100k because PDLP + crossover returned a non-optimal total while reporting Optimal. A solver whose status can't be trusted has to be verified, and its failures are a result.
+- **Consequence:** cuOpt loses to Go at every size (20–2,100×), and at 100k only crossover reached the optimum on all 3 seeds (≈ 210 s vs Go's 0.79 s). cuOpt is built for large LPs/MILPs and routing; a special-purpose assignment algorithm wins on this problem.

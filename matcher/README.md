@@ -56,6 +56,36 @@ Nsight Compute on a mid-run phase: at 30k, SMs are active **4.3%** of cycles (ab
 
 What might change the answer: a hybrid (GPU auction for the parallel early phases, CPU SSP to finish from its prices), forward/reverse auction for rectangular problems (no slack bidders), or a barrier-free warp for the tail.
 
+## E4 with NVIDIA cuOpt (LP solvers) → `bench/e4/results/rtx5060_wsl2_cuopt.json`
+
+```bash
+# cuOpt needs Python <= 3.13, the project uses 3.14: a separate venv on the GPU machine
+uv venv -p 3.13 ~/cuopt_probe && cd ~/cuopt_probe
+uv pip install --python .venv/bin/python "cuopt-cu12==26.10.*" "numpy<2.5" scipy ortools matplotlib pytest   --extra-index-url https://pypi.nvidia.com
+uv pip install --python .venv/bin/python --no-deps -e ~/fleetline/matcher
+cd ~/fleetline/matcher
+~/cuopt_probe/.venv/bin/python -m pytest -q tests/test_cuopt.py
+~/cuopt_probe/.venv/bin/python -m fleetline_matcher.bench --machine rtx5060_wsl2_cuopt   --solvers cuopt_pdlp,cuopt_pdlp_crossover,cuopt_dual_simplex
+~/cuopt_probe/.venv/bin/python ../bench/e4/cuopt_methods.py > ../bench/e4/cuopt_methods.txt
+```
+
+cuOpt (26.10) solves routing problems and LP/MILP; it has **no assignment API**, so the instance is written as the assignment LP: one variable per (rider, car) edge plus an "unmatched" variable per rider, rider rows `= 1`, car rows `<= 1` (`solvers._cuopt_lp`). The matrix is totally unimodular, so a *vertex* optimum is 0/1. Same machine, same instances, same day as the GPU auction run; Go re-run alongside as the reference. Every cuOpt total is checked against Go and its gap recorded ([D-019](../docs/DECISIONS.md)).
+
+| Riders | Go SSP | cuOpt PDLP (GPU, tight tol.) | cuOpt PDLP + crossover | cuOpt dual simplex (CPU) |
+| --- | --- | --- | --- | --- |
+| 1,000 | **1.4 ms** | 1.12 s | 1.00 s | 68 ms |
+| 3,000 | **7.2 ms** | 1.34 s | 1.54 s | 233 ms |
+| 10,000 | **30.8 ms** | 1.58 s | 3.20 s | 1.49 s |
+| 30,000 | **93.6 ms** | 1.83 s | 16.8 s | 11.3 s |
+| 100,000 | **792 ms** | 3.64 s, **not optimal** (3/3 seeds) | 210 s (205–218) | 136 s / 142 s; 3rd seed **not optimal** |
+
+Median of 3 seeds, solve time only (building cuOpt's input is setup, ≤ 0.35 s). Optimal = same total as Go, on every instance up to 30k for all three.
+
+- **Go wins everywhere: 20× (PDLP at 30k) to 2,100× (PDLP at 100 riders).** cuOpt pays ~1 s of fixed cost even for 100 riders; PDLP's time grows slowly (1.1 → 1.8 s from 1k to 30k), which is the GPU's strength, but the answer stops being an assignment at 100k.
+- **"Optimal" status ≠ assignment optimum.** At 100k, PDLP reports Optimal on all 3 seeds with ~315k fractional edge variables; the rounded assignment's gap to Go is 7.4–7.5 × 10¹⁰ (÷ the 10⁶ unmatched cost: ~74k riders' worth). With default tolerances it already fails at 1k (`bench/e4/cuopt_methods.txt`).
+- **Barrier never gives an assignment here**: its interior solution is fractional at 1k and 10k, and with crossover enabled the solution stayed fractional (10k: 52 s, still 71k fractional variables). Not benchmarked further.
+- Dual simplex stopped once with status TimeLimit after 1.9 s (100k, seed 1; the limit was 600 s), returning a non-optimal total. PDLP + crossover was optimal on all 3 seeds at 100k in this run, but returned a non-optimal total at 100k in an earlier run (not kept: the bench aborted on it, which is why gaps are now recorded instead).
+
 ## GPU smoke test (Phase 1, checklist F)
 
 On the RTX 5060 machine: `matcher/gpu_smoke/run.sh`. It prints the GPU, builds and checks a CUDA vector-add (correctness + memory bandwidth), and runs an fp16 matmul in PyTorch. Run on 2026-11-26 (Ubuntu 24.04 on WSL2, driver 591.84, CUDA 12.9); full output in `bench/gpu_smoke.txt`:

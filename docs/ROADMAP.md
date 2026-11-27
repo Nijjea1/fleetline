@@ -15,7 +15,7 @@ Steps for the GPU machine: [`GPU_MACHINE.md`](GPU_MACHINE.md).
 | 2.6 | Dashboard: greedy vs batched side by side on the same morning | Mac | ✅ `?mode=compare` |
 | 2.7 | GPU smoke test: `matcher/gpu_smoke/run.sh` | GPU | ✅ `bench/gpu_smoke.txt` |
 | 2.8 | CUDA assignment solver (auction algorithm) + pybind11, joins E4; Nsight profile | GPU | ✅ exact; loses to Go at every size (100k: 1.18 s vs 0.65 s), beats OR-Tools/SciPy at 100k; `bench/e4/profiles/` |
-| 2.9 | NVIDIA cuOpt in E4 | GPU (Linux/WSL) | ⬜ |
+| 2.9 | NVIDIA cuOpt in E4 | GPU (Linux/WSL) | ✅ as an LP (no assignment API); loses to Go 20–2,100×, PDLP not optimal at 100k; D-019 |
 
 ## Phase 3 · ML + cloud
 | # | Item | Where | Status |
