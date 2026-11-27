@@ -22,7 +22,10 @@ ml/
       train.py           training loop (MPS on the Mac, CUDA on the RTX 5060)
       export.py          ONNX export, parity check, latency benchmark
     av/                  robotaxi motion model (stretch)
-  tensorrt/bench.sh      TensorRT FP32/FP16 engines + timing (run on the RTX 5060)
+  tensorrt/
+    to_fp16.py           FP16 copy of the ONNX graph (TensorRT 11 is strongly typed)
+    bench.sh, parse.py   trtexec: FP32/TF32/FP16 engines, GPU compute time
+    check.py             full-test-set accuracy per engine + latency from Python
   results/               every reported number, as JSON
   tests/
 ```
@@ -39,6 +42,9 @@ uv run fleetline-ml dataset                    # 13.8M / 1.9M / 4.1M rows
 uv run fleetline-ml baselines                  # E5 part 1 -> results/e5_baselines.json
 uv run fleetline-ml train                      # E5 part 2 -> results/e5_residual_mlp.json
 uv run fleetline-ml export                     # E6 (Mac) -> results/e6_inference_mac.json
+# E6 on the RTX 5060 (WSL2, TensorRT 11.5), from the repo root:
+bash ml/tensorrt/bench.sh 2>&1 | tee ml/results/e6_tensorrt_raw.txt && python3 ml/tensorrt/parse.py
+ml/.venv/bin/python ml/tensorrt/check.py      # -> results/e6_tensorrt_python.json
 ```
 
 ## ETA model
@@ -86,7 +92,40 @@ Dispatch scores many (car, rider) pairs per round, so latency **per batch** matt
 | 1,024 | 0.315 ms | 0.314 ms | 0.386 ms |
 | 8,192 | 2.371 ms | 2.582 ms | **1.220 ms** |
 
-p50 latency, 200 reps after warm-up, idle M5 MacBook. CPU wins up to ~1k rows; the M5 GPU is ~2× faster at 8k. (An earlier run taken while training was using the CPU showed 20 ms at 8k: a reminder to benchmark on an idle machine.) Every runtime serves the same ONNX file. Mac numbers: `results/e6_inference_mac.json`. TensorRT FP32/FP16 (and INT8 with calibration) run on the RTX 5060 via `tensorrt/bench.sh`.
+p50 latency, 200 reps after warm-up, idle M5 MacBook. CPU wins up to ~1k rows; the M5 GPU is ~2× faster at 8k. (An earlier run taken while training was using the CPU showed 20 ms at 8k: a reminder to benchmark on an idle machine.) Every runtime serves the same ONNX file. Mac numbers: `results/e6_inference_mac.json`. TensorRT numbers (RTX 5060) are below.
+
+### TensorRT on the RTX 5060
+
+Same ONNX file, three engines: **FP32** (TF32 off), **TF32** (TensorRT's default: FP32 storage, tensor-core matmuls) and **FP16** (an FP16 copy of the graph, since TensorRT 11 is strongly typed and dropped the `--fp16` flag).
+
+**Accuracy, all 4,086,192 test trips** (`results/e6_tensorrt_python.json`):
+
+| Engine | Test MAE | vs PyTorch FP32 | Largest per-trip difference |
+| --- | --- | --- | --- |
+| PyTorch FP32 (CUDA) | 266.096 s | | |
+| TensorRT FP32 | 266.096 s | +0.000 s | 0.0015 s |
+| TensorRT TF32 | 266.099 s | +0.003 s | 2.2 s |
+| TensorRT FP16 | 266.098 s | +0.003 s | 5.5 s |
+
+FP16 changes individual predictions by up to 5.5 s (0.3 s on average) but the error over the test set by only 0.003 s, well inside the 0.5 s bar set for this check.
+
+**Latency from Python**, timed like the Mac table (inputs already on the GPU, synchronise after each call, 200 reps): p50, median of 3 runs (range in brackets):
+
+| Batch | PyTorch CUDA | TensorRT FP32 | TensorRT FP16 |
+| --- | --- | --- | --- |
+| 1 | 1.163 ms | 0.164 ms (0.161–0.303) | **0.131 ms** (0.119–0.142) |
+| 256 | 0.865 ms | 0.274 ms (0.224–0.393) | **0.145 ms** (0.123–0.155) |
+| 1,024 | 0.833 ms | 0.179 ms (0.168–0.291) | 0.215 ms (0.127–0.274) |
+| 8,192 | 0.845 ms | 0.524 ms (0.519–0.527) | **0.375 ms** (0.285–0.457) |
+
+**GPU compute only** (`trtexec`, ≥ 5 s per engine, `results/e6_tensorrt.json`): 0.041 ms (FP32) vs 0.031 ms (FP16) at batch 1; at 8,192, 0.287 ms (FP32), 0.189 ms (TF32), **0.095 ms (FP16, 3.0× FP32)**.
+
+What this shows:
+- **TensorRT FP16 is 2.3–8.9× faster than eager PyTorch on the same GPU** (batch 1: 1.16 → 0.13 ms; batch 8,192: 0.85 → 0.38 ms); FP32 engines 1.6–7.1×. PyTorch launches one kernel per layer from Python; TensorRT fuses layers into a few kernels.
+- **Below ~1k rows, overhead decides, not precision.** The GPU computes a batch of 1 in 0.03–0.04 ms, but a call from Python costs ~0.13 ms (launch + synchronise, under WSL2). FP32 and FP16 overlap within their run-to-run ranges up to 1,024 rows.
+- **FP16 pays off on big batches**: 3.0× FP32 in pure GPU time at 8,192 rows, 1.4× as a Python caller sees it.
+- Across machines (different hardware, so indicative only): at batch 1 the Mac's ONNX Runtime CPU (0.009 ms) is still ~15× faster than any GPU call here; at 8,192 TensorRT FP16 (0.375 ms) beats the M5 GPU (1.22 ms) and ONNX Runtime CPU (2.58 ms). For dispatch-sized batches (thousands of car × rider pairs per round) the GPU path wins; for one-off ETA queries the CPU does.
+- **Not done: INT8.** It needs a calibration pass on real rows to be meaningful; the FP16 result already leaves little latency to win at these sizes.
 
 ## Robotaxi motion model (stretch, E8)
 

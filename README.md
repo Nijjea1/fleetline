@@ -83,7 +83,7 @@ The penalty was tuned on 200 training routes and the held-out set was run once. 
 | **LightGBM** | **236.5 s** (−54% vs OSRM) |
 | Residual MLP (PyTorch, DeepETA-style) | 266.1 s: loses to LightGBM; wider/longer training didn't help |
 
-ONNX export matches PyTorch exactly (same test MAE); ONNX Runtime CPU 0.009 ms at batch 1, M5 GPU 2× faster than CPU at batch 8,192. → [`ml/`](ml/)
+ONNX export matches PyTorch exactly (same test MAE); ONNX Runtime CPU 0.009 ms at batch 1, M5 GPU 2× faster than CPU at batch 8,192. On an RTX 5060, TensorRT FP16 keeps the same test MAE (+0.003 s) and is 2.3–8.9× faster than PyTorch on the same GPU (0.38 ms at batch 8,192). → [`ml/`](ml/)
 
 ### Bugs the benchmarks caught
 - **A "6× better than Uber" demo** that was a warm-up artifact (fleet still idle at 08:00).
@@ -119,7 +119,7 @@ Requires Go, Docker, [uv](https://docs.astral.sh/uv/), Node.
 | --- | --- |
 | `core/` | Go: world, dispatch, state (Redis + in-memory), offline simulator, fleetd, worldsim, load generator |
 | `sim/` | Python: data download, cleaning, travel-model calibration |
-| `ml/` | ETA model: OSRM, LightGBM, PyTorch, ONNX, TensorRT script |
+| `ml/` | ETA model: OSRM, LightGBM, PyTorch, ONNX, TensorRT |
 | `routing/` | Python: E7 last-mile stop sequencing (OR-Tools) on Amazon routes |
 | `bench/` | Every experiment's script and results |
 | `web/` | Next.js + deck.gl dashboard |

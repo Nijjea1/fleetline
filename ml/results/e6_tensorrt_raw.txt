@@ -1,0 +1,109 @@
+== env
+NVIDIA GeForce RTX 5060 Laptop GPU, 591.84, 8151 MiB, 12.0
+cuda Build cuda_12.9.r12.9/compiler.36037853_0
+&&&& RUNNING TensorRT.trtexec [TensorRT v110500] [b63] # trtexec --help
+== batch 1 fp32
+[11/26/2026-23:49:16] [I] Throughput: 12863.2 qps
+[11/26/2026-23:49:16] [I] Latency: min = 0.027832 ms, max = 5.32458 ms, mean = 0.0603065 ms, median = 0.0412598 ms, percentile(90%) = 0.103516 ms, percentile(95%) = 0.125488 ms, percentile(99%) = 0.19574 ms
+[11/26/2026-23:49:16] [I] H2D Latency: min = 0 ms, max = 0 ms, mean = 0 ms, median = 0 ms, percentile(90%) = 0 ms, percentile(95%) = 0 ms, percentile(99%) = 0 ms
+[11/26/2026-23:49:16] [I] GPU Compute Time: min = 0.027832 ms, max = 5.32458 ms, mean = 0.0603065 ms, median = 0.0412598 ms, percentile(90%) = 0.103516 ms, percentile(95%) = 0.125488 ms, percentile(99%) = 0.19574 ms
+[11/26/2026-23:49:16] [I] D2H Latency: min = 0 ms, max = 0 ms, mean = 0 ms, median = 0 ms, percentile(90%) = 0 ms, percentile(95%) = 0 ms, percentile(99%) = 0 ms
+[11/26/2026-23:49:16] [I] Total GPU Compute Time: 3.87879 s
+== batch 1 tf32
+[11/26/2026-23:49:27] [I] Throughput: 13479.6 qps
+[11/26/2026-23:49:27] [I] Latency: min = 0.0175171 ms, max = 4.75684 ms, mean = 0.0537802 ms, median = 0.032959 ms, percentile(90%) = 0.097168 ms, percentile(95%) = 0.125732 ms, percentile(99%) = 0.186035 ms
+[11/26/2026-23:49:27] [I] H2D Latency: min = 0 ms, max = 0 ms, mean = 0 ms, median = 0 ms, percentile(90%) = 0 ms, percentile(95%) = 0 ms, percentile(99%) = 0 ms
+[11/26/2026-23:49:27] [I] GPU Compute Time: min = 0.0175171 ms, max = 4.75684 ms, mean = 0.0537802 ms, median = 0.032959 ms, percentile(90%) = 0.097168 ms, percentile(95%) = 0.125732 ms, percentile(99%) = 0.186035 ms
+[11/26/2026-23:49:27] [I] D2H Latency: min = 0 ms, max = 0 ms, mean = 0 ms, median = 0 ms, percentile(90%) = 0 ms, percentile(95%) = 0 ms, percentile(99%) = 0 ms
+[11/26/2026-23:49:27] [I] Total GPU Compute Time: 3.62468 s
+== batch 1 fp16
+[11/26/2026-23:49:39] [I] Throughput: 13673.4 qps
+[11/26/2026-23:49:39] [I] Latency: min = 0.012207 ms, max = 9.81665 ms, mean = 0.0516765 ms, median = 0.0305176 ms, percentile(90%) = 0.09375 ms, percentile(95%) = 0.12085 ms, percentile(99%) = 0.182312 ms
+[11/26/2026-23:49:39] [I] H2D Latency: min = 0 ms, max = 0 ms, mean = 0 ms, median = 0 ms, percentile(90%) = 0 ms, percentile(95%) = 0 ms, percentile(99%) = 0 ms
+[11/26/2026-23:49:39] [I] GPU Compute Time: min = 0.012207 ms, max = 9.81665 ms, mean = 0.0516765 ms, median = 0.0305176 ms, percentile(90%) = 0.09375 ms, percentile(95%) = 0.12085 ms, percentile(99%) = 0.182312 ms
+[11/26/2026-23:49:39] [I] D2H Latency: min = 0 ms, max = 0 ms, mean = 0 ms, median = 0 ms, percentile(90%) = 0 ms, percentile(95%) = 0 ms, percentile(99%) = 0 ms
+[11/26/2026-23:49:39] [I] Total GPU Compute Time: 3.53302 s
+== batch 32 fp32
+[11/26/2026-23:49:49] [I] Throughput: 12522.6 qps
+[11/26/2026-23:49:49] [I] Latency: min = 0.0234375 ms, max = 2.17578 ms, mean = 0.0609913 ms, median = 0.0405273 ms, percentile(90%) = 0.10498 ms, percentile(95%) = 0.12915 ms, percentile(99%) = 0.206787 ms
+[11/26/2026-23:49:49] [I] H2D Latency: min = 0 ms, max = 0 ms, mean = 0 ms, median = 0 ms, percentile(90%) = 0 ms, percentile(95%) = 0 ms, percentile(99%) = 0 ms
+[11/26/2026-23:49:49] [I] GPU Compute Time: min = 0.0234375 ms, max = 2.17578 ms, mean = 0.0609913 ms, median = 0.0405273 ms, percentile(90%) = 0.10498 ms, percentile(95%) = 0.12915 ms, percentile(99%) = 0.206787 ms
+[11/26/2026-23:49:49] [I] D2H Latency: min = 0 ms, max = 0 ms, mean = 0 ms, median = 0 ms, percentile(90%) = 0 ms, percentile(95%) = 0 ms, percentile(99%) = 0 ms
+[11/26/2026-23:49:49] [I] Total GPU Compute Time: 3.81897 s
+== batch 32 tf32
+[11/26/2026-23:50:00] [I] Throughput: 13731.8 qps
+[11/26/2026-23:50:00] [I] Latency: min = 0.0166016 ms, max = 6.17096 ms, mean = 0.0536622 ms, median = 0.0325928 ms, percentile(90%) = 0.0927734 ms, percentile(95%) = 0.122192 ms, percentile(99%) = 0.190063 ms
+[11/26/2026-23:50:00] [I] H2D Latency: min = 0 ms, max = 0 ms, mean = 0 ms, median = 0 ms, percentile(90%) = 0 ms, percentile(95%) = 0 ms, percentile(99%) = 0 ms
+[11/26/2026-23:50:00] [I] GPU Compute Time: min = 0.0166016 ms, max = 6.17096 ms, mean = 0.0536622 ms, median = 0.0325928 ms, percentile(90%) = 0.0927734 ms, percentile(95%) = 0.122192 ms, percentile(99%) = 0.190063 ms
+[11/26/2026-23:50:00] [I] D2H Latency: min = 0 ms, max = 0 ms, mean = 0 ms, median = 0 ms, percentile(90%) = 0 ms, percentile(95%) = 0 ms, percentile(99%) = 0 ms
+[11/26/2026-23:50:00] [I] Total GPU Compute Time: 3.6845 s
+== batch 32 fp16
+[11/26/2026-23:50:12] [I] Throughput: 14190.3 qps
+[11/26/2026-23:50:12] [I] Latency: min = 0.0161133 ms, max = 2.09888 ms, mean = 0.0513531 ms, median = 0.0305786 ms, percentile(90%) = 0.092041 ms, percentile(95%) = 0.123047 ms, percentile(99%) = 0.197998 ms
+[11/26/2026-23:50:12] [I] H2D Latency: min = 0 ms, max = 0 ms, mean = 0 ms, median = 0 ms, percentile(90%) = 0 ms, percentile(95%) = 0 ms, percentile(99%) = 0 ms
+[11/26/2026-23:50:12] [I] GPU Compute Time: min = 0.0161133 ms, max = 2.09888 ms, mean = 0.0513531 ms, median = 0.0305786 ms, percentile(90%) = 0.092041 ms, percentile(95%) = 0.123047 ms, percentile(99%) = 0.197998 ms
+[11/26/2026-23:50:12] [I] D2H Latency: min = 0 ms, max = 0 ms, mean = 0 ms, median = 0 ms, percentile(90%) = 0 ms, percentile(95%) = 0 ms, percentile(99%) = 0 ms
+[11/26/2026-23:50:12] [I] Total GPU Compute Time: 3.64371 s
+== batch 256 fp32
+[11/26/2026-23:50:23] [I] Throughput: 12190.2 qps
+[11/26/2026-23:50:23] [I] Latency: min = 0.0351562 ms, max = 1.06909 ms, mean = 0.065422 ms, median = 0.0473633 ms, percentile(90%) = 0.109131 ms, percentile(95%) = 0.131592 ms, percentile(99%) = 0.206055 ms
+[11/26/2026-23:50:23] [I] H2D Latency: min = 0 ms, max = 0 ms, mean = 0 ms, median = 0 ms, percentile(90%) = 0 ms, percentile(95%) = 0 ms, percentile(99%) = 0 ms
+[11/26/2026-23:50:23] [I] GPU Compute Time: min = 0.0351562 ms, max = 1.06909 ms, mean = 0.065422 ms, median = 0.0473633 ms, percentile(90%) = 0.109131 ms, percentile(95%) = 0.131592 ms, percentile(99%) = 0.206055 ms
+[11/26/2026-23:50:23] [I] D2H Latency: min = 0 ms, max = 0 ms, mean = 0 ms, median = 0 ms, percentile(90%) = 0 ms, percentile(95%) = 0 ms, percentile(99%) = 0 ms
+[11/26/2026-23:50:23] [I] Total GPU Compute Time: 3.98786 s
+== batch 256 tf32
+[11/26/2026-23:50:35] [I] Throughput: 12971.6 qps
+[11/26/2026-23:50:35] [I] Latency: min = 0.0249023 ms, max = 5.19958 ms, mean = 0.0595625 ms, median = 0.0405273 ms, percentile(90%) = 0.10083 ms, percentile(95%) = 0.123535 ms, percentile(99%) = 0.185547 ms
+[11/26/2026-23:50:35] [I] H2D Latency: min = 0 ms, max = 0 ms, mean = 0 ms, median = 0 ms, percentile(90%) = 0 ms, percentile(95%) = 0 ms, percentile(99%) = 0 ms
+[11/26/2026-23:50:35] [I] GPU Compute Time: min = 0.0249023 ms, max = 5.19958 ms, mean = 0.0595625 ms, median = 0.0405273 ms, percentile(90%) = 0.10083 ms, percentile(95%) = 0.123535 ms, percentile(99%) = 0.185547 ms
+[11/26/2026-23:50:35] [I] D2H Latency: min = 0 ms, max = 0 ms, mean = 0 ms, median = 0 ms, percentile(90%) = 0 ms, percentile(95%) = 0 ms, percentile(99%) = 0 ms
+[11/26/2026-23:50:35] [I] Total GPU Compute Time: 3.86334 s
+== batch 256 fp16
+[11/26/2026-23:50:47] [I] Throughput: 13822.6 qps
+[11/26/2026-23:50:47] [I] Latency: min = 0.019043 ms, max = 2.54468 ms, mean = 0.0547865 ms, median = 0.034668 ms, percentile(90%) = 0.0925293 ms, percentile(95%) = 0.117188 ms, percentile(99%) = 0.185547 ms
+[11/26/2026-23:50:47] [I] H2D Latency: min = 0 ms, max = 0 ms, mean = 0 ms, median = 0 ms, percentile(90%) = 0 ms, percentile(95%) = 0 ms, percentile(99%) = 0 ms
+[11/26/2026-23:50:47] [I] GPU Compute Time: min = 0.019043 ms, max = 2.54468 ms, mean = 0.0547865 ms, median = 0.034668 ms, percentile(90%) = 0.0925293 ms, percentile(95%) = 0.117188 ms, percentile(99%) = 0.185547 ms
+[11/26/2026-23:50:47] [I] D2H Latency: min = 0 ms, max = 0 ms, mean = 0 ms, median = 0 ms, percentile(90%) = 0 ms, percentile(95%) = 0 ms, percentile(99%) = 0 ms
+[11/26/2026-23:50:47] [I] Total GPU Compute Time: 3.78651 s
+== batch 1024 fp32
+[11/26/2026-23:50:57] [I] Throughput: 12167.3 qps
+[11/26/2026-23:50:57] [I] Latency: min = 0.0507812 ms, max = 11.2397 ms, mean = 0.0697859 ms, median = 0.053833 ms, percentile(90%) = 0.106812 ms, percentile(95%) = 0.129883 ms, percentile(99%) = 0.197632 ms
+[11/26/2026-23:50:57] [I] H2D Latency: min = 0 ms, max = 0 ms, mean = 0 ms, median = 0 ms, percentile(90%) = 0 ms, percentile(95%) = 0 ms, percentile(99%) = 0 ms
+[11/26/2026-23:50:57] [I] GPU Compute Time: min = 0.0507812 ms, max = 11.2397 ms, mean = 0.0697859 ms, median = 0.053833 ms, percentile(90%) = 0.106812 ms, percentile(95%) = 0.129883 ms, percentile(99%) = 0.197632 ms
+[11/26/2026-23:50:57] [I] D2H Latency: min = 0 ms, max = 0 ms, mean = 0 ms, median = 0 ms, percentile(90%) = 0 ms, percentile(95%) = 0 ms, percentile(99%) = 0 ms
+[11/26/2026-23:50:57] [I] Total GPU Compute Time: 4.24584 s
+== batch 1024 tf32
+[11/26/2026-23:51:07] [I] Throughput: 12840 qps
+[11/26/2026-23:51:07] [I] Latency: min = 0.043457 ms, max = 4.01636 ms, mean = 0.0645896 ms, median = 0.0473633 ms, percentile(90%) = 0.102783 ms, percentile(95%) = 0.126099 ms, percentile(99%) = 0.195801 ms
+[11/26/2026-23:51:07] [I] H2D Latency: min = 0 ms, max = 0 ms, mean = 0 ms, median = 0 ms, percentile(90%) = 0 ms, percentile(95%) = 0 ms, percentile(99%) = 0 ms
+[11/26/2026-23:51:07] [I] GPU Compute Time: min = 0.043457 ms, max = 4.01636 ms, mean = 0.0645896 ms, median = 0.0473633 ms, percentile(90%) = 0.102783 ms, percentile(95%) = 0.126099 ms, percentile(99%) = 0.195801 ms
+[11/26/2026-23:51:07] [I] D2H Latency: min = 0 ms, max = 0 ms, mean = 0 ms, median = 0 ms, percentile(90%) = 0 ms, percentile(95%) = 0 ms, percentile(99%) = 0 ms
+[11/26/2026-23:51:07] [I] Total GPU Compute Time: 4.14665 s
+== batch 1024 fp16
+[11/26/2026-23:51:18] [I] Throughput: 13119.3 qps
+[11/26/2026-23:51:18] [I] Latency: min = 0.0258789 ms, max = 2.19019 ms, mean = 0.060332 ms, median = 0.0415039 ms, percentile(90%) = 0.100586 ms, percentile(95%) = 0.118896 ms, percentile(99%) = 0.185059 ms
+[11/26/2026-23:51:18] [I] H2D Latency: min = 0 ms, max = 0 ms, mean = 0 ms, median = 0 ms, percentile(90%) = 0 ms, percentile(95%) = 0 ms, percentile(99%) = 0 ms
+[11/26/2026-23:51:18] [I] GPU Compute Time: min = 0.0258789 ms, max = 2.19019 ms, mean = 0.060332 ms, median = 0.0415039 ms, percentile(90%) = 0.100586 ms, percentile(95%) = 0.118896 ms, percentile(99%) = 0.185059 ms
+[11/26/2026-23:51:18] [I] D2H Latency: min = 0 ms, max = 0 ms, mean = 0 ms, median = 0 ms, percentile(90%) = 0 ms, percentile(95%) = 0 ms, percentile(99%) = 0 ms
+[11/26/2026-23:51:18] [I] Total GPU Compute Time: 3.95766 s
+== batch 8192 fp32
+[11/26/2026-23:51:28] [I] Throughput: 3344.13 qps
+[11/26/2026-23:51:28] [I] Latency: min = 0.23999 ms, max = 10.3542 ms, mean = 0.29121 ms, median = 0.286621 ms, percentile(90%) = 0.305054 ms, percentile(95%) = 0.314575 ms, percentile(99%) = 0.355469 ms
+[11/26/2026-23:51:28] [I] H2D Latency: min = 0 ms, max = 0 ms, mean = 0 ms, median = 0 ms, percentile(90%) = 0 ms, percentile(95%) = 0 ms, percentile(99%) = 0 ms
+[11/26/2026-23:51:28] [I] GPU Compute Time: min = 0.23999 ms, max = 10.3542 ms, mean = 0.29121 ms, median = 0.286621 ms, percentile(90%) = 0.305054 ms, percentile(95%) = 0.314575 ms, percentile(99%) = 0.355469 ms
+[11/26/2026-23:51:28] [I] D2H Latency: min = 0 ms, max = 0 ms, mean = 0 ms, median = 0 ms, percentile(90%) = 0 ms, percentile(95%) = 0 ms, percentile(99%) = 0 ms
+[11/26/2026-23:51:28] [I] Total GPU Compute Time: 4.86961 s
+== batch 8192 tf32
+[11/26/2026-23:51:39] [I] Throughput: 4944.83 qps
+[11/26/2026-23:51:39] [I] Latency: min = 0.166016 ms, max = 3.12744 ms, mean = 0.196501 ms, median = 0.188477 ms, percentile(90%) = 0.207886 ms, percentile(95%) = 0.229736 ms, percentile(99%) = 0.361816 ms
+[11/26/2026-23:51:39] [I] H2D Latency: min = 0 ms, max = 0 ms, mean = 0 ms, median = 0 ms, percentile(90%) = 0 ms, percentile(95%) = 0 ms, percentile(99%) = 0 ms
+[11/26/2026-23:51:39] [I] GPU Compute Time: min = 0.166016 ms, max = 3.12744 ms, mean = 0.196501 ms, median = 0.188477 ms, percentile(90%) = 0.207886 ms, percentile(95%) = 0.229736 ms, percentile(99%) = 0.361816 ms
+[11/26/2026-23:51:39] [I] D2H Latency: min = 0 ms, max = 0 ms, mean = 0 ms, median = 0 ms, percentile(90%) = 0 ms, percentile(95%) = 0 ms, percentile(99%) = 0 ms
+[11/26/2026-23:51:39] [I] Total GPU Compute Time: 4.85868 s
+== batch 8192 fp16
+[11/26/2026-23:51:51] [I] Throughput: 8951.21 qps
+[11/26/2026-23:51:51] [I] Latency: min = 0.0910034 ms, max = 10.5137 ms, mean = 0.104128 ms, median = 0.0947266 ms, percentile(90%) = 0.114258 ms, percentile(95%) = 0.163208 ms, percentile(99%) = 0.239502 ms
+[11/26/2026-23:51:51] [I] H2D Latency: min = 0 ms, max = 0 ms, mean = 0 ms, median = 0 ms, percentile(90%) = 0 ms, percentile(95%) = 0 ms, percentile(99%) = 0 ms
+[11/26/2026-23:51:51] [I] GPU Compute Time: min = 0.0910034 ms, max = 10.5137 ms, mean = 0.104128 ms, median = 0.0947266 ms, percentile(90%) = 0.114258 ms, percentile(95%) = 0.163208 ms, percentile(99%) = 0.239502 ms
+[11/26/2026-23:51:51] [I] D2H Latency: min = 0 ms, max = 0 ms, mean = 0 ms, median = 0 ms, percentile(90%) = 0 ms, percentile(95%) = 0 ms, percentile(99%) = 0 ms
+[11/26/2026-23:51:51] [I] Total GPU Compute Time: 4.66057 s

@@ -1,0 +1,162 @@
+{
+  "env": {
+    "gpu": "NVIDIA GeForce RTX 5060 Laptop GPU",
+    "driver": "591.84",
+    "cuda_toolkit": "Build cuda_12.9.r12.9/compiler.36037853_0",
+    "tensorrt": "110500",
+    "os": "Ubuntu 24.04 on WSL2"
+  },
+  "method": "trtexec, warm-up 500 ms, >= 2000 iterations and >= 5 s, GPU compute time only (no host<->device copies); fp32 = --noTF32, tf32 = TensorRT default, fp16 = FP16 ONNX graph (ml/tensorrt/to_fp16.py)",
+  "latency": [
+    {
+      "runtime": "tensorrt_fp32",
+      "batch": 1,
+      "batches_per_s": 12863.2,
+      "rows_per_s": 12863.2,
+      "p50_ms": 0.0412598,
+      "p99_ms": 0.19574,
+      "mean_ms": 0.0603065,
+      "min_ms": 0.027832
+    },
+    {
+      "runtime": "tensorrt_tf32",
+      "batch": 1,
+      "batches_per_s": 13479.6,
+      "rows_per_s": 13479.6,
+      "p50_ms": 0.032959,
+      "p99_ms": 0.186035,
+      "mean_ms": 0.0537802,
+      "min_ms": 0.0175171
+    },
+    {
+      "runtime": "tensorrt_fp16",
+      "batch": 1,
+      "batches_per_s": 13673.4,
+      "rows_per_s": 13673.4,
+      "p50_ms": 0.0305176,
+      "p99_ms": 0.182312,
+      "mean_ms": 0.0516765,
+      "min_ms": 0.012207
+    },
+    {
+      "runtime": "tensorrt_fp32",
+      "batch": 32,
+      "batches_per_s": 12522.6,
+      "rows_per_s": 400723.2,
+      "p50_ms": 0.0405273,
+      "p99_ms": 0.206787,
+      "mean_ms": 0.0609913,
+      "min_ms": 0.0234375
+    },
+    {
+      "runtime": "tensorrt_tf32",
+      "batch": 32,
+      "batches_per_s": 13731.8,
+      "rows_per_s": 439417.6,
+      "p50_ms": 0.0325928,
+      "p99_ms": 0.190063,
+      "mean_ms": 0.0536622,
+      "min_ms": 0.0166016
+    },
+    {
+      "runtime": "tensorrt_fp16",
+      "batch": 32,
+      "batches_per_s": 14190.3,
+      "rows_per_s": 454089.6,
+      "p50_ms": 0.0305786,
+      "p99_ms": 0.197998,
+      "mean_ms": 0.0513531,
+      "min_ms": 0.0161133
+    },
+    {
+      "runtime": "tensorrt_fp32",
+      "batch": 256,
+      "batches_per_s": 12190.2,
+      "rows_per_s": 3120691.2,
+      "p50_ms": 0.0473633,
+      "p99_ms": 0.206055,
+      "mean_ms": 0.065422,
+      "min_ms": 0.0351562
+    },
+    {
+      "runtime": "tensorrt_tf32",
+      "batch": 256,
+      "batches_per_s": 12971.6,
+      "rows_per_s": 3320729.6,
+      "p50_ms": 0.0405273,
+      "p99_ms": 0.185547,
+      "mean_ms": 0.0595625,
+      "min_ms": 0.0249023
+    },
+    {
+      "runtime": "tensorrt_fp16",
+      "batch": 256,
+      "batches_per_s": 13822.6,
+      "rows_per_s": 3538585.6,
+      "p50_ms": 0.034668,
+      "p99_ms": 0.185547,
+      "mean_ms": 0.0547865,
+      "min_ms": 0.019043
+    },
+    {
+      "runtime": "tensorrt_fp32",
+      "batch": 1024,
+      "batches_per_s": 12167.3,
+      "rows_per_s": 12459315.2,
+      "p50_ms": 0.053833,
+      "p99_ms": 0.197632,
+      "mean_ms": 0.0697859,
+      "min_ms": 0.0507812
+    },
+    {
+      "runtime": "tensorrt_tf32",
+      "batch": 1024,
+      "batches_per_s": 12840.0,
+      "rows_per_s": 13148160.0,
+      "p50_ms": 0.0473633,
+      "p99_ms": 0.195801,
+      "mean_ms": 0.0645896,
+      "min_ms": 0.043457
+    },
+    {
+      "runtime": "tensorrt_fp16",
+      "batch": 1024,
+      "batches_per_s": 13119.3,
+      "rows_per_s": 13434163.2,
+      "p50_ms": 0.0415039,
+      "p99_ms": 0.185059,
+      "mean_ms": 0.060332,
+      "min_ms": 0.0258789
+    },
+    {
+      "runtime": "tensorrt_fp32",
+      "batch": 8192,
+      "batches_per_s": 3344.13,
+      "rows_per_s": 27395112.96,
+      "p50_ms": 0.286621,
+      "p99_ms": 0.355469,
+      "mean_ms": 0.29121,
+      "min_ms": 0.23999
+    },
+    {
+      "runtime": "tensorrt_tf32",
+      "batch": 8192,
+      "batches_per_s": 4944.83,
+      "rows_per_s": 40508047.36,
+      "p50_ms": 0.188477,
+      "p99_ms": 0.361816,
+      "mean_ms": 0.196501,
+      "min_ms": 0.166016
+    },
+    {
+      "runtime": "tensorrt_fp16",
+      "batch": 8192,
+      "batches_per_s": 8951.21,
+      "rows_per_s": 73328312.32,
+      "p50_ms": 0.0947266,
+      "p99_ms": 0.239502,
+      "mean_ms": 0.104128,
+      "min_ms": 0.0910034
+    }
+  ]
+}
