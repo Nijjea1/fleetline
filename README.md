@@ -49,7 +49,9 @@ Instances from real NYC pickup/drop-off points (8 nearest cars per rider); every
 | 1,000 | **0.40 ms** | 7.5 ms | 1.4 ms |
 | 100,000 | **168 ms** | 4.76 s (28×) | 36.4 s (217×) |
 
-Geography keeps augmenting paths short, so the Go solver scales ~n^1.1. CUDA comparison pending on the RTX 5060. → [`matcher/`](matcher/README.md)
+Geography keeps augmenting paths short, so the Go solver scales ~n^1.1. → [`matcher/`](matcher/README.md)
+
+**GPU (RTX 5060, same-machine comparison):** a custom CUDA auction solver, exact and verified against Go on every run, **never beats the Go solver**. At 100k riders it takes 1.18 s vs Go's 649 ms on that laptop, while beating OR-Tools (18.0 s) by 15× and SciPy (50.5 s) by 43×. Below 30k riders it loses to every CPU solver (1k: 250 ms vs 1.6 ms). Nsight shows why: the work is chains of evictions handled a few bids per round, so ~1 of 26 SMs is busy ([learning note 10](docs/learning/10-gpu-auction.md)). Dashed lines in the plot are the RTX 5060 machine.
 
 ![E4](bench/e4/e4.png)
 
